@@ -1,4 +1,5 @@
 use crate::helpers::{get_random_email, TestApp};
+use auth_service::routes::SignupResponse;
 
 // TODO: Implement tests for all other routes (signup, login, logout, verify-2fa, and verify-token)
 #[tokio::test]
@@ -7,7 +8,7 @@ async fn signup_returns_200_for_valid_credentials() {
 
     let response = app.signup("test@example.com", "password123").await;
 
-    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(response.status().as_u16(), 201);
 }
 
 #[tokio::test]
@@ -50,4 +51,25 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+}
+
+#[tokio::test]
+async fn should_return_201_if_valid_input() {
+    //...
+    let app = TestApp::new().await;
+    let response = app.signup("test@example.com", "password123").await;
+
+    assert_eq!(response.status().as_u16(), 201);
+
+    let expected_response = SignupResponse {
+        message: "User created successfully!".to_owned(),
+    };
+    // Assert that we are getting the correct response body!
+    assert_eq!(
+        response
+            .json::<SignupResponse>()
+            .await
+            .expect("Could not deserialize response body to UserBody"),
+        expected_response
+    );
 }
