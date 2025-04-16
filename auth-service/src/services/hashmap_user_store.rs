@@ -51,6 +51,7 @@ impl HashmapUserStore {
         }
         Ok(())
     }
+
 }
 
 // TODO: Add unit tests for your `HashmapUserStore` implementation
