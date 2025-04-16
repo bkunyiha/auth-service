@@ -1,31 +1,39 @@
 use axum::{extract::State, http::StatusCode, response::IntoResponse, extract::Json};
 use serde::{Deserialize, Serialize};
 use crate::app_state::AppState;
-use crate::domain::User;
+use crate::domain::{AuthAPIError, User};
 
 pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupRequest>) -> impl IntoResponse {
 
-    match (request.email, request.password, request.requires_2fa) {
-        (email, password, true) if email == "test@example.com" && password == "password123" => {
-            let user = User::new(email, password, true);
-            let mut user_store = state.user_store.write().await;
+    let email = request.email;
+    let password = request.password;
 
-            // TODO: Add `user` to the `user_store`. Simply unwrap the returned `Result` enum type for now.
-            user_store.add_user(user).unwrap();
-
-            
-            let response: Json<SignupResponse> = Json(SignupResponse {
-                message: "User created successfully!".to_string(),
-            });
-            (StatusCode::CREATED, response)
-        },
-        _ => {
-            let response = Json(SignupResponse {
-                message: "User Creation Failed!".to_string(),
-            });
-            (StatusCode::BAD_REQUEST, response)
-        },
+    // TODO: early return AuthAPIError::InvalidCredentials if:
+    // - email is empty or does not contain '@'
+    // - password is less than 8 characters
+    if email.is_empty() || !email.contains('@') || password.len() < 8 {
+        return Err(AuthAPIError::InvalidCredentials);
     }
+
+    let mut user_store = state.user_store.write().await;
+
+    // TODO: early return AuthAPIError::UserAlreadyExists if email exists in user_store.
+    if user_store.get_user(&email).is_ok() {
+        return Err(AuthAPIError::UserAlreadyExists);
+    }
+
+    let user = User::new(email, password, request.requires_2fa);
+
+    // TODO: instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
+    if user_store.add_user(user).is_err() {
+        return Err(AuthAPIError::UnexpectedError);
+    }
+
+    let response = Json(SignupResponse {
+        message: "User created successfully!".to_string(),
+    });
+
+    Ok((StatusCode::CREATED, response))
 }
 
 #[derive(Deserialize, Debug)]
@@ -34,6 +42,12 @@ pub struct SignupRequest {
     pub password: String,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
+}
+
+impl SignupRequest {
+    pub fn new(email: String, password: String) -> Self {
+        Self { email, password, requires_2fa: true }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]

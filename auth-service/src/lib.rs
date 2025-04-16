@@ -1,12 +1,40 @@
+
+use std::error::Error;
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    serve::Serve,
+    Json, Router,
+};
+use app_state::AppState;
+use domain::AuthAPIError;
+use serde::{Deserialize, Serialize};
+
 pub mod routes;
 pub mod domain;
 pub mod services;
 pub mod app_state;
 
-use std::error::Error;
-use axum::Router;
-use axum::serve::Serve;
-use app_state::AppState;
+#[derive(Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: String,
+}
+
+impl IntoResponse for AuthAPIError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
+            AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
+            AuthAPIError::UnexpectedError => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
+            }
+        };
+        let body = Json(ErrorResponse {
+            error: error_message.to_string(),
+        });
+        (status, body).into_response()
+    }
+}
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
