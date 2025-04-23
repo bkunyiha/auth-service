@@ -74,7 +74,7 @@ impl User {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fake::{faker::internet::en::SafeEmail, Fake};
+    use fake::{faker::{internet::en::SafeEmail, internet::en::Password as FakerPassword}, Fake};
 
     #[test]
     fn test_email_parse() {
@@ -97,7 +97,7 @@ mod tests {
     
     #[test]
     fn test_password_parse() {
-        let password_str: String = SafeEmail().fake();
+        let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
         let password = Password::parse(password_str.clone());
         assert_eq!(password, Ok(Password{ password:password_str}));
     }

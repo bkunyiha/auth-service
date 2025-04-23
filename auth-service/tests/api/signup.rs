@@ -1,6 +1,6 @@
-use crate::helpers::{get_random_email, TestApp};
+use crate::helpers::TestApp;
 use auth_service::{routes::SignupResponse, ErrorResponse};
-
+use fake::{faker::internet::en::SafeEmail, Fake};
 
 // TODO: Implement tests for all other routes (signup, login, logout, verify-2fa, and verify-token)
 #[tokio::test]
@@ -94,7 +94,7 @@ async fn should_return_409_if_email_already_exists() {
 async fn should_return_422_if_malformed_input() {
     let app = TestApp::new().await;
 
-    let random_email = get_random_email();
+    let random_email: String = SafeEmail().fake();
 
     let test_cases = [
         serde_json::json!({
