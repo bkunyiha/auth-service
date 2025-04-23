@@ -2,6 +2,7 @@ services:
   app-service:
     image: bkunyiha/app-service # specify name of image on Docker Hub
     restart: "always" # automatically restart container when server crashes
+    hostname: app-service
     environment: # set up environment variables
       AUTH_SERVICE_IP: ${AUTH_SERVICE_IP:-localhost} # Use localhost as the default value
     ports:
@@ -9,8 +10,70 @@ services:
     depends_on: # only run app-service after auth-service has started
       auth-service:
         condition: service_started
+    networks:
+      - app-network
+
   auth-service:
     image: bkunyiha/auth-service
     restart: "always" # automatically restart container when server crashes
+    hostname: auth-service
     ports:
       - "3000:3000" # expose port 3000 so that applications outside the container can connect to it 
+    networks:
+      - app-network   
+
+  web-server:
+    image: nginx:mainline-alpine
+    restart: "always" # automatically restart container when server crashes
+    hostname: web-server
+    ports:
+      - "80:80"
+      - 443:443
+    volumes:
+      - web-root:/var/www/html # mount web-root volume to /var/www/html on the container
+      - ./nginx-conf:/etc/nginx/conf.d # mount nginx-conf volume to /etc/nginx/conf.d
+      - ./certbot-etc:/etc/letsencrypt # mount certbot-etc volume(Let’s Encrypt certificates and keys) to /etc/letsencrypt
+      - ./certbot-var:/var/lib/letsencrypt # mount certbot-var volume(Let’s Encrypt’s default working directory) to /var/lib/letsencrypt
+      - ./dhparam:/etc/ssl/certs
+    depends_on:
+      auth-service:
+        condition: service_started
+      app-service:
+        condition: service_started
+    networks:
+      - app-network
+
+  # Manages SSL certificates
+  # Uses Let's Encrypt for free SSL certificates
+  # Depends on web-server being ready
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - web-root:/var/www/html # mount web-root volume to /var/www/html on the container
+      - ./certbot-etc:/etc/letsencrypt # mount certbot-etc volume(Let’s Encrypt certificates and keys) to /etc/letsencrypt  
+      - ./certbot-var:/var/lib/letsencrypt # mount certbot-var volume(Let’s Encrypt’s default working directory) to /var/lib/letsencrypt
+    depends_on:
+      web-server: # only run certbot after web-server has started
+        condition: service_started
+    command: certonly --verbose --webroot --webroot-path=/var/www/html --email bkunyiha@billkunyiha.com --agree-tos --no-eff-email --force-renewal -d app-service.billkunyiha.com -d auth-service.billkunyiha.com;
+    networks:
+      - app-network
+
+volumes:
+  certbot-etc:       # Stores SSL certificates. Mounted at /etc/letsencrypt in containers
+  certbot-var:       # Stores Let's Encrypt working files. Mounted at /var/lib/letsencrypt in containers
+  web-root:          # Stores website files
+    driver: local    # Uses local filesystem storage
+    driver_opts:     # Specific options for the volume
+      type: none     # Direct mount (no special filesystem)
+      device: /auth-service/html/  # Source path on host
+      o: bind        # Bind mount type
+  dhparam:
+    driver: local
+    driver_opts:
+      type: none
+      device: /dhparam/
+      o: bind
+networks:
+  app-network:
+      driver: bridge
