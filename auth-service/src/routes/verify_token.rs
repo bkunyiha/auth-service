@@ -1,6 +1,54 @@
 use axum::response::IntoResponse;
 use axum::http::StatusCode;
+use axum::extract::Json;
+use axum_extra::extract::CookieJar;
+use serde::{Deserialize, Serialize};
+use crate::domain::AuthAPIError;
+use crate::utils::{auth::validate_token, constants::JWT_COOKIE_NAME};
 
-pub async fn verify_token() -> impl IntoResponse {
-    StatusCode::OK.into_response()
+
+pub async fn verify_token(
+    jar: CookieJar,
+    Json(request): Json<VerifyTokenRequest>,
+) -> impl IntoResponse {
+
+    let req_token = request.token;
+    
+    // Retrieve JWT cookie from the `CookieJar`
+    // Return AuthAPIError::MissingToken is the cookie is not found
+    let cookie = match jar.get(JWT_COOKIE_NAME) {
+        Some(cookie) => cookie,
+        None => return Err(AuthAPIError::MissingToken),
+    };
+
+    let token = cookie.value().to_owned();
+
+    // Validate JWT token by calling `validate_token` from the auth service.
+    // If the token is valid you can ignore the returned claims for now.
+    // Return AuthAPIError::InvalidToken is validation fails.
+    match validate_token(&token).await {
+        Ok(_) => {
+            if token == req_token {
+                Ok(StatusCode::OK)
+            } else {
+                Err(AuthAPIError::InvalidToken)
+            }
+        },
+        Err(_) => return Err(AuthAPIError::InvalidToken),
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct VerifyTokenRequest {
+    pub token: String,
+}
+
+impl VerifyTokenRequest {
+    pub fn new(token: String) -> Self {
+        Self { token }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct VerifyTokenResponse {
 }
