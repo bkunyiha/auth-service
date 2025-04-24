@@ -37,9 +37,11 @@ jobs:
         cargo build --verbose
         cargo test --verbose
 
+      # For the Build and test auth-service code job we will set JWT_SECRET to the dummy value "secret":
     - name: Build and test auth-service code
       working-directory: ./auth-service
       run: |
+        export JWT_SECRET=secret
         cargo build --verbose
         cargo test --verbose
 
@@ -92,6 +94,7 @@ jobs:
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
           cd ~
+          export JWT_SECRET=${{ secrets.JWT_SECRET }}
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
           docker compose down
           docker compose pull
