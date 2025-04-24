@@ -43,7 +43,7 @@ impl IntoResponse for AuthAPIError {
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
-    server: Serve<Router, Router>,
+    server: Serve<tokio::net::TcpListener, Router, Router>,
     // address is exposed as a public field
     // so we have access to it in tests.
     pub address: String,

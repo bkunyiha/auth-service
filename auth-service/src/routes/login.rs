@@ -1,6 +1,6 @@
 use axum::{extract::State, http::StatusCode, extract::Json, debug_handler};
 use axum_extra::extract::CookieJar;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::{
     app_state::AppState,
@@ -11,7 +11,7 @@ use crate::{
 #[debug_handler]
 pub async fn login(
     State(state): State<AppState>,
-    jar: CookieJar, // New!
+    jar: CookieJar,
     Json(request): Json<LoginRequest>,
 ) -> (CookieJar, Result<StatusCode, AuthAPIError>) {
 
@@ -51,9 +51,4 @@ impl LoginRequest {
     pub fn new(email: String, password: String) -> Self {
         Self { email, password }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct LoginResponse {
-    pub token: String,
 }
