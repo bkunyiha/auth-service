@@ -1,14 +1,16 @@
-
 use std::error::Error;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     serve::Serve,
     Json, Router,
+    http::Method,
 };
 use app_state::AppState;
 use domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
+use tower_http::cors::CorsLayer;
+use utils::constants::APP_SERVICE_HOST;
 
 pub mod routes;
 pub mod domain;
@@ -26,7 +28,8 @@ impl IntoResponse for AuthAPIError {
         let (status, error_message) = match self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
-            AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, "Incorrect credentials"),
+            AuthAPIError::IncorrectCredentials |  AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Incorrect credentials"),
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing JWT Token"),
             AuthAPIError::UnexpectedError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
@@ -49,9 +52,22 @@ pub struct Application {
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
 
+        // Allow the app service(running on our local machine and in production) to call the auth service
+        let allowed_origins = [
+            "http://localhost:8000".parse()?,
+            format!("http://{}", *APP_SERVICE_HOST).parse()?,
+        ];
+
+        let cors = CorsLayer::new()
+            // Allow GET and POST requests
+            .allow_methods([Method::GET, Method::POST])
+            // Allow cookies to be included in requests
+            .allow_credentials(true)
+            .allow_origin(allowed_origins);
+
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
-        let server = axum::serve(listener, routes::get_routes(app_state));
+        let server = axum::serve(listener, routes::get_routes(app_state, cors));
 
         // Create a new Application instance and return it
         Ok(Application{server,address})

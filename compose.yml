@@ -21,6 +21,7 @@ services:
       - "3000:3000" # expose port 3000 so that applications outside the container can connect to it
     environment:
       JWT_SECRET: ${JWT_SECRET} 
+      APP_SERVICE_HOST: ${APP_SERVICE_HOST}
     networks:
       - app-network   
 
