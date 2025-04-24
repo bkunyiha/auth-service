@@ -2,11 +2,24 @@ use dotenvy::dotenv;
 use lazy_static::lazy_static;
 use std::env as std_env;
 
+pub const JWT_COOKIE_NAME: &str = "jwt";
+
+pub mod test {
+    pub const APP_SERVICE_HOST: &str = "127.0.0.1:0";
+}
+
 // Define a lazily evaluated static. lazy_static is needed because std_env::var is not a const function.
 lazy_static! {
     pub static ref JWT_SECRET: String = set_token();
+    pub static ref APP_SERVICE_HOST: String = set_app_service_host();
 }
 
+pub mod env {
+    pub const JWT_SECRET_ENV_VAR: &str = "JWT_SECRET";
+    pub const APP_SERVICE_HOST_ENV_VAR: &str = "APP_SERVICE_HOST";
+}
+
+// Set the JWT secret from the environment variable
 fn set_token() -> String {
     dotenv().ok(); // Load environment variables
     let secret = std_env::var(env::JWT_SECRET_ENV_VAR).expect("JWT_SECRET must be set.");
@@ -16,8 +29,12 @@ fn set_token() -> String {
     secret
 }
 
-pub mod env {
-    pub const JWT_SECRET_ENV_VAR: &str = "JWT_SECRET";
+// Set the app host from the environment variable
+fn set_app_service_host() -> String {
+    dotenv().ok(); // Load environment variables
+    let prod_host = std_env::var(env::APP_SERVICE_HOST_ENV_VAR).expect("APP_SERVICE_HOST must be set.");
+    if prod_host.is_empty() {
+        panic!("APP_SERVICE_HOST must not be empty.");
+    }
+    prod_host
 }
-
-pub const JWT_COOKIE_NAME: &str = "jwt";

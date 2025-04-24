@@ -60,6 +60,7 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
     assert!(!auth_cookie.value().is_empty());
 }
 
+
 #[tokio::test]
 async fn should_return_400_if_invalid_input() {
     // Call the log-in route with invalid credentials and assert that a

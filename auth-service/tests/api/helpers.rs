@@ -1,12 +1,19 @@
-use auth_service::Application;
-use auth_service::services::hashmap_user_store::HashmapUserStore;
-use auth_service::app_state::{AppState, UserStoreType};
+
+use auth_service::{
+    Application,
+    app_state::{AppState, UserStoreType},
+    services::hashmap_user_store::HashmapUserStore,
+    utils::constants::test,
+};
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde_json::json;
+use reqwest::cookie::Jar;
 
 pub struct TestApp {
     pub address: String,
+    pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
 }
 
@@ -16,22 +23,29 @@ impl TestApp {
         let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(HashmapUserStore::default())));
         let app_state = AppState::new(user_store);
 
-        let app = Application::build(app_state, "0.0.0.0:0")
+        let app = Application::build(app_state, test::APP_SERVICE_HOST)
             .await
             .expect("Failed to build app");
 
         let address = format!("http://{}", app.address.clone());
 
         // Run the auth service in a separate async task
-        // to avoid blocking the main test thread. 
+        // to avoid blocking the main test thread.
+        // This is a new feature in Rust 1.71.0
+        // and is not yet available in the stable version of Rust.        
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 
-        let http_client = reqwest::Client::new();
-
+        // Create a new cookie jar and HTTP client
+        let cookie_jar = Arc::new(Jar::default());
+        let http_client = reqwest::Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
         // Create new `TestApp` instance and return it
         Self {
             address,
+            cookie_jar,
             http_client,
         }
     }
@@ -81,6 +95,18 @@ impl TestApp {
     pub async fn logout(&self) -> reqwest::Response {
         self.http_client
             .post(&format!("{}/logout", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_logout<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
+        self.http_client
+            .post(&format!("{}/logout", &self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
