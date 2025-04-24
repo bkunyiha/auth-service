@@ -12,6 +12,9 @@ target/
 # DS_Store file is an invisible, proprietary file used by macOS's Finder to store metadata about a folder
 .DS_Store
 
+# env file
+.env
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

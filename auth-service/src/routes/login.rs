@@ -1,18 +1,44 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, extract::Json, debug_handler};
+use axum::{extract::State, http::StatusCode, extract::Json, debug_handler};
+use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
-use crate::app_state::AppState;
-use crate::domain::{AuthAPIError, Email, Password};
 
+use crate::{
+    app_state::AppState,
+    domain::{AuthAPIError, Email, Password},
+    utils::auth::generate_auth_cookie,
+};
 
 #[debug_handler]
-pub async fn login(State(state): State<AppState>, Json(request): Json<LoginRequest>) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = Email::parse(request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
-    let password = Password::parse(request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
+pub async fn login(
+    State(state): State<AppState>,
+    jar: CookieJar, // New!
+    Json(request): Json<LoginRequest>,
+) -> (CookieJar, Result<StatusCode, AuthAPIError>) {
+
+    let email = match Email::parse(request.email) {
+        Ok(email) => email,
+        Err(_) => return (jar, Err(AuthAPIError::InvalidCredentials)),
+    };
+    let password = match Password::parse(request.password) {
+        Ok(password) => password,
+        Err(_) => return (jar, Err(AuthAPIError::InvalidCredentials)),
+    };
 
     let user_store = state.user_store.read().await;
-    let _ = user_store.validate_user(&email, &password).await.map_err(|_| AuthAPIError::IncorrectCredentials)?;
+    let _ = match user_store.validate_user(&email, &password).await {
+        Ok(_) => (),
+        Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
+    };
 
-    Ok(StatusCode::OK.into_response())
+    let auth_cookie = match generate_auth_cookie(&email) {
+        Ok(cookie) => cookie,
+        Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
+    };
+
+    let updated_jar = jar.add(auth_cookie);
+
+    // Return the updated cookie jar and a 200 status code
+    (updated_jar, Ok(StatusCode::OK))
 }
 
 #[derive(Deserialize, Debug)]
