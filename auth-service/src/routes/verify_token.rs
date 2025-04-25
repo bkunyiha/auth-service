@@ -1,19 +1,25 @@
 use axum::response::IntoResponse;
 use axum::http::StatusCode;
-use axum::extract::Json;
+use axum::extract::{Json, State};
 use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 use crate::domain::AuthAPIError;
 use crate::utils::{auth::validate_token, constants::JWT_COOKIE_NAME};
-
+use crate::app_state::AppState;
 
 pub async fn verify_token(
+    State(state): State<AppState>,
     jar: CookieJar,
-    Json(request): Json<VerifyTokenRequest>,
+    Json(request): Json<VerifyTokenRequest>,    
 ) -> impl IntoResponse {
 
     let req_token = request.token;
-    
+    let banned_token_store = state.banned_token_store.read().await;
+    match banned_token_store.get_token(&req_token).await {
+        Ok(_) => return Err(AuthAPIError::InvalidToken),
+        Err(_) => Ok(()),
+    }?;
+
     // Retrieve JWT cookie from the `CookieJar`
     // Return AuthAPIError::MissingToken is the cookie is not found
     let cookie = match jar.get(JWT_COOKIE_NAME) {
@@ -27,8 +33,8 @@ pub async fn verify_token(
     // If the token is valid you can ignore the returned claims for now.
     // Return AuthAPIError::InvalidToken is validation fails.
     match validate_token(&token).await {
-        Ok(_) => {
-            if token == req_token {
+        Ok(_) => {            
+            if token == req_token {                
                 Ok(StatusCode::OK)
             } else {
                 Err(AuthAPIError::InvalidToken)

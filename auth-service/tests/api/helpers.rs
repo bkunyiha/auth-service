@@ -1,8 +1,8 @@
 
 use auth_service::{
     Application,
-    app_state::{AppState, UserStoreType},
-    services::hashmap_user_store::HashmapUserStore,
+    app_state::{AppState, UserStoreType, BannedTokenStoreType},
+    services::{HashmapUserStore, HashsetBannedTokenStore},
     utils::constants::test,
 };
 
@@ -15,13 +15,15 @@ pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
+    pub banned_token_store: BannedTokenStoreType,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
 
         let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(HashmapUserStore::default())));
-        let app_state = AppState::new(user_store);
+        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));
+        let app_state: AppState = AppState::new(user_store, banned_token_store.clone());
 
         let app = Application::build(app_state, test::APP_SERVICE_HOST)
             .await
@@ -47,6 +49,7 @@ impl TestApp {
             address,
             cookie_jar,
             http_client,
+            banned_token_store,
         }
     }
 
@@ -58,7 +61,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    // TODO: Implement helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
+    // Implement helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
     pub async fn signup(&self, email: &str, password: &str) -> reqwest::Response {
         self.http_client
             .post(&format!("{}/signup", &self.address))

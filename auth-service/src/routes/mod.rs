@@ -18,7 +18,6 @@ pub use verify_token::*;
 
 pub fn get_routes(app_state: AppState, cors: CorsLayer) -> Router {
     
-    // .nest_service("/", ServeDir::new("assets").fallback(ServeFile::new("assets")));
     Router::new()
         .route("/signup", post(signup))
         .route("/login", post(login))
