@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::domain::{User, UserStoreError, UserStore, Email, Password};
 
-// TODO: Create a new struct called `HashmapUserStore` containing a `users` field
+// Create a new struct called `HashmapUserStore` containing a `users` field
 // which stores a `HashMap`` of email `String`s mapped to `User` objects.
 // Derive the `Default` trait for `HashmapUserStore`.
 #[derive(Clone,Default)]
@@ -20,7 +20,7 @@ impl HashmapUserStore {
         Ok(())
     }
 
-    // TODO: Implement a public method called `get_user`, which takes an
+    // Implement a public method called `get_user`, which takes an
     // immutable reference to self and an email string slice as arguments.
     // This function should return a `Result` type containing either a
     // `User` object or a `UserStoreError`.
@@ -29,7 +29,7 @@ impl HashmapUserStore {
         self.users.get(email).ok_or(UserStoreError::UserNotFound)
     }
 
-    // TODO: Implement a public method called `validate_user`, which takes an
+    // Implement a public method called `validate_user`, which takes an
     // immutable reference to self, an email string slice, and a password string slice
     // as arguments. `validate_user` should return a `Result` type containing either a
     // unit type `()` if the email/password passed in match an existing user, or a `UserStoreError`.
