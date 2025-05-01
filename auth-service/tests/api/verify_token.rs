@@ -14,7 +14,7 @@ async fn verify_token_returns_200() {
     let signup_request = serde_json::json!({
         "email": email_str,
         "password": password_str,
-        "requires2FA": true
+        "requires2FA": false
     });
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
@@ -64,7 +64,7 @@ async fn should_return_401_if_invalid_token() {
     let signup_request = serde_json::json!({
         "email": email_str,
         "password": password_str,
-        "requires2FA": true
+        "requires2FA": false
     });
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
@@ -96,7 +96,7 @@ async fn should_return_401_if_banned_token() {
     let signup_request = serde_json::json!({
         "email": email_str,
         "password": password_str,
-        "requires2FA": true
+        "requires2FA": false
     });
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
