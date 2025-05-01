@@ -34,7 +34,6 @@ pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> (CookieJar
     let mut cookie_for_removal = Cookie::from(JWT_COOKIE_NAME);
     cookie_for_removal.set_path("/"); // Needed for https context removal
     let updated_jar = jar.remove(cookie_for_removal);
-
     // Return the updated cookie jar and a 200 status code
     (updated_jar, Ok(StatusCode::OK))    
 }
