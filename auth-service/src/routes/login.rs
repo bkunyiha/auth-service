@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     app_state::AppState,
-    domain::{data_stores::{LoginAttemptId, TwoFACode}, AuthAPIError, Email, Password, email_client::EmailClient},
+    domain::{LoginAttemptId, TwoFACode, AuthAPIError, Email, Password, email_client::EmailClient},
     utils::auth::generate_auth_cookie,
 };
 
@@ -54,37 +54,41 @@ async fn handle_2fa(
     // Return a TwoFactorAuthResponse. The message should be "2FA required".
     // The login attempt ID should be "123456". We will replace this hard-coded login attempt ID soon!
     let login_attempt_id =Uuid::new_v4().to_string();
-    let message = "2FA required".to_string();
-    // Store the ID and code in our 2FA code store. Return `AuthAPIError::UnexpectedError` if the operation fails
-    let mut two_fa_store = state.two_fa_code_store.write().await;
-    let _ = match two_fa_store.get_code(&email).await {
-        Ok(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
-        Err(_) => (),
-    };
-
     let login_attempt = match LoginAttemptId::parse(login_attempt_id.clone()) {
         Ok(id) => id,
         Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
     };
-    let _ = match two_fa_store.add_code(email.clone(), login_attempt, TwoFACode::default()).await {
-        Ok(_) => (),
-        Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
-    };
+    let message = "2FA required".to_string();
+    let tw_code = TwoFACode::default();
+    // Store the ID and code in our 2FA code store. Return `AuthAPIError::UnexpectedError` if the operation fails
+
+    if state
+        .two_fa_code_store
+        .write()
+        .await
+        .add_code(email.clone(), login_attempt, tw_code.clone())
+        .await
+        .is_err()
+    {
+        return (jar, Err(AuthAPIError::UnexpectedError));
+    }
 
     // send 2FA code via the email client. Return `AuthAPIError::UnexpectedError` if the operation fails.
-    let message_clone = message.clone();
-    let login_id_str = login_attempt_id.clone();
-    let _ = match state.email_client
-                                .send_email(email, message_clone.as_ref(), login_id_str.as_ref())
-                                .await {
-                                    Ok(id) => id,
-                                    Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
-                                };
+    if state
+        .email_client
+        .write()
+        .await
+        .send_email(email, "2FA Code", tw_code.as_ref())
+        .await
+        .is_err()
+    {
+        return (jar, Err(AuthAPIError::UnexpectedError));
+    }
 
     // Return 
     let response = TwoFactorAuthResponse {
         message,
-        login_attempt_id: login_attempt_id,
+        login_attempt_id,
     };
 
     (

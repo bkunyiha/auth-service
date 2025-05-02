@@ -12,4 +12,6 @@ pub use error::{AuthAPIError, AuthAPIError::*};
 pub use data_stores::{
     UserStore, UserStoreError, 
     BannedTokenStore, BannedTokenStoreError, 
-    TwoFACodeStore, TwoFACodeStoreError};
+    TwoFACodeStore, TwoFACodeStoreError,
+    LoginAttemptId, TwoFACode,
+};

@@ -11,7 +11,7 @@ use crate::domain::MockEmailClient;
 pub type UserStoreType = Arc<RwLock<Box<dyn UserStore>>>;
 pub type BannedTokenStoreType = Arc<RwLock<Box<dyn BannedTokenStore>>>;
 pub type TwoFACodeStoreType = Arc<RwLock<Box<dyn TwoFACodeStore>>>;
-pub type EmailClientType = MockEmailClient;
+pub type EmailClientType = Arc<RwLock<Box<MockEmailClient>>>;
 
 #[derive(Clone)]
 pub struct AppState {
