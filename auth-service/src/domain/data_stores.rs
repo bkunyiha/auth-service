@@ -73,7 +73,7 @@ impl Default for LoginAttemptId {
     }
 }
 
-// TODO: Implement AsRef<str> for LoginAttemptId
+// Implement AsRef<str> for LoginAttemptId
 impl AsRef<str> for LoginAttemptId {
     fn as_ref(&self) -> &str {
         &self.0.as_ref()
@@ -102,7 +102,7 @@ impl Default for TwoFACode {
     }
 }
 
-// TODO: Implement AsRef<str> for TwoFACode
+// Implement AsRef<str> for TwoFACode
 impl AsRef<str> for TwoFACode {
     fn as_ref(&self) -> &str {
         self.0.as_str()

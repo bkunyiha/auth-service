@@ -1,9 +1,9 @@
-
 use auth_service::{
     Application,
-    app_state::{AppState, UserStoreType, BannedTokenStoreType, TwoFACodeStoreType},
+    app_state::{AppState, UserStoreType, BannedTokenStoreType, TwoFACodeStoreType, EmailClientType},
     services::{HashmapUserStore, HashsetBannedTokenStore, HashmapTwoFACodeStore},
     utils::constants::test,
+    domain::MockEmailClient,
 };
 
 use std::sync::Arc;
@@ -25,8 +25,9 @@ impl TestApp {
         let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(HashmapUserStore::default())));
         let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));
         let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let email_client: EmailClientType = MockEmailClient;
 
-        let app_state: AppState = AppState::new(user_store, banned_token_store.clone(), two_fa_code_store.clone());
+        let app_state: AppState = AppState::new(user_store, banned_token_store.clone(), two_fa_code_store.clone(), email_client);
 
         let app = Application::build(app_state, test::APP_SERVICE_HOST)
             .await
