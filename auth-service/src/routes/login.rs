@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     app_state::AppState,
-    domain::{data_stores::{LoginAttemptId, TwoFACode}, AuthAPIError, Email, Password},
+    domain::{data_stores::{LoginAttemptId, TwoFACode}, AuthAPIError, Email, Password, email_client::EmailClient},
     utils::auth::generate_auth_cookie,
 };
 
@@ -55,19 +55,14 @@ async fn handle_2fa(
     // The login attempt ID should be "123456". We will replace this hard-coded login attempt ID soon!
     let login_attempt_id =Uuid::new_v4().to_string();
     let message = "2FA required".to_string();
-    let response = TwoFactorAuthResponse {
-        message,
-        login_attempt_id: login_attempt_id.clone(),
-    };
-
-    // TODO: Store the ID and code in our 2FA code store. Return `AuthAPIError::UnexpectedError` if the operation fails
+    // Store the ID and code in our 2FA code store. Return `AuthAPIError::UnexpectedError` if the operation fails
     let mut two_fa_store = state.two_fa_code_store.write().await;
     let _ = match two_fa_store.get_code(&email).await {
         Ok(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
         Err(_) => (),
     };
 
-    let login_attempt = match LoginAttemptId::parse(login_attempt_id) {
+    let login_attempt = match LoginAttemptId::parse(login_attempt_id.clone()) {
         Ok(id) => id,
         Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
     };
@@ -75,7 +70,23 @@ async fn handle_2fa(
         Ok(_) => (),
         Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
     };
+
+    // send 2FA code via the email client. Return `AuthAPIError::UnexpectedError` if the operation fails.
+    let message_clone = message.clone();
+    let login_id_str = login_attempt_id.clone();
+    let _ = match state.email_client
+                                .send_email(email, message_clone.as_ref(), login_id_str.as_ref())
+                                .await {
+                                    Ok(id) => id,
+                                    Err(_) => return (jar, Err(AuthAPIError::UnexpectedError)),
+                                };
+
     // Return 
+    let response = TwoFactorAuthResponse {
+        message,
+        login_attempt_id: login_attempt_id,
+    };
+
     (
         jar, 
         Ok((StatusCode::PARTIAL_CONTENT, Json(LoginResponse::TwoFactorAuth(response))))
