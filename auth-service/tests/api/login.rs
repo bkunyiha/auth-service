@@ -160,7 +160,7 @@ async fn should_return_2fa_required_message_when_2fa_enabled() {
     
     assert_eq!(json_body.message, "2FA required".to_owned());
 
-    // TODO: assert that `json_body.login_attempt_id` is stored inside `app.two_fa_code_store`
+    // assert that `json_body.login_attempt_id` is stored inside `app.two_fa_code_store`
     let two_fa_store = app.two_fa_code_store.read().await;
     let email = Email::parse(email_str).unwrap();
     let (stored_login_attempt_id, _) = two_fa_store.get_code(&email).await.unwrap();

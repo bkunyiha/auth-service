@@ -12,7 +12,7 @@ async fn main() {
     let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(HashmapUserStore::default())));
     let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));
     let two_fa_token_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
-    let email_client: EmailClientType = MockEmailClient;
+    let email_client: EmailClientType = Arc::new(RwLock::new(Box::new(MockEmailClient)));
     
     let app_state: AppState = AppState::new(user_store, banned_token_store, two_fa_token_store, email_client);
     
