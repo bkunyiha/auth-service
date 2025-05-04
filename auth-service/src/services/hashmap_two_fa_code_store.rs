@@ -25,9 +25,9 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError> {
         if self.codes.contains_key(&email) {
             self.codes.remove(&email);
-            return Ok(())
+            Ok(())
         } else {
-            return Err(TwoFACodeStoreError::LoginAttemptIdNotFound);
+            Err(TwoFACodeStoreError::LoginAttemptIdNotFound)
         }
     }
 
@@ -41,13 +41,18 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
     use crate::domain::user::Email;
     use fake::{faker::internet::en::SafeEmail, Fake};
+    use tokio::sync::RwLock;
+    use crate::app_state::TwoFACodeStoreType;
 
     #[tokio::test]
     async fn test_add_code() {
-        let mut store = HashmapTwoFACodeStore::default();
+        //let mut store = HashmapTwoFACodeStore::default();
+        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let mut store = two_fa_code_store.write().await;
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.to_string()).unwrap();
         let login_attempt_id = LoginAttemptId::default();
@@ -65,7 +70,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_code() {
-        let mut store = HashmapTwoFACodeStore::default();
+        //let mut store = HashmapTwoFACodeStore::default();
+        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let mut store = two_fa_code_store.write().await;
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.to_string()).unwrap();
         let login_attempt_id = LoginAttemptId::default();
@@ -92,7 +99,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_code() {
-        let mut store = HashmapTwoFACodeStore::default();
+        //let mut store = HashmapTwoFACodeStore::default();
+        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let mut store = two_fa_code_store.write().await;
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.to_string()).unwrap();
         let login_attempt_id = LoginAttemptId::default();
