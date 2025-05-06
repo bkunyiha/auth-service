@@ -12,11 +12,13 @@ pub mod test {
 lazy_static! {
     pub static ref JWT_SECRET: String = set_token();
     pub static ref APP_SERVICE_HOST: String = set_app_service_host();
+    pub static ref DATABASE_URL: String = set_db_url();
 }
 
 pub mod env {
     pub const JWT_SECRET_ENV_VAR: &str = "JWT_SECRET";
     pub const APP_SERVICE_HOST_ENV_VAR: &str = "APP_SERVICE_HOST";
+    pub const DB_URL_ENV_VAR: &str = "DB_URL";
 }
 
 // Set the JWT secret from the environment variable
@@ -35,6 +37,16 @@ fn set_app_service_host() -> String {
     let prod_host = std_env::var(env::APP_SERVICE_HOST_ENV_VAR).expect("APP_SERVICE_HOST must be set.");
     if prod_host.is_empty() {
         panic!("APP_SERVICE_HOST must not be empty.");
+    }
+    prod_host
+}
+
+// Set the db url from the environment variable
+fn set_db_url() -> String {
+    dotenv().ok(); // Load environment variables
+    let prod_host = std_env::var(env::DB_URL_ENV_VAR).expect("DB_URL must be set.");
+    if prod_host.is_empty() {
+        panic!("DB_URL must not be empty.");
     }
     prod_host
 }

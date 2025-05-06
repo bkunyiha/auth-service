@@ -11,6 +11,7 @@ use domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 use utils::constants::APP_SERVICE_HOST;
+use sqlx::{PgPool, postgres::PgPoolOptions};
 
 pub mod routes;
 pub mod domain;
@@ -77,4 +78,9 @@ impl Application {
         println!("listening on {}", &self.address);
         self.server.await
     }
+}
+
+pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
+    // Create a new PostgreSQL connection pool
+    PgPoolOptions::new().max_connections(5).connect(url).await
 }
