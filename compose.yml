@@ -22,9 +22,23 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET} 
       APP_SERVICE_HOST: ${APP_SERVICE_HOST}
+      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD}@db:5432"
+    depends_on:
+      - db  
     networks:
-      - app-network   
+      - app-network
 
+  db:
+    image: postgres:15.2-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+    networks:
+      - app-network  
   web-server:
     image: nginx:mainline-alpine
     restart: "always" # automatically restart container when server crashes
@@ -77,6 +91,8 @@ volumes:
       type: none
       device: /dhparam/
       o: bind
+  db:
+    driver: local    
 networks:
   app-network:
       driver: bridge
