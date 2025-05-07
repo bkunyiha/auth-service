@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use auth_service::{
     Application,
     app_state::{AppState, UserStoreType, BannedTokenStoreType, TwoFACodeStoreType, EmailClientType},
@@ -11,21 +12,24 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde_json::json;
 use reqwest::cookie::Jar;
-use sqlx::{PgPool, postgres::PgPoolOptions, Executor};
+use sqlx::{PgPool, postgres::{PgPoolOptions, PgConnectOptions}, PgConnection, Executor, Connection};
 use uuid::Uuid;
+
+pub struct DBName(String);
 
 pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
-    pub two_fa_code_store: TwoFACodeStoreType
+    pub two_fa_code_store: TwoFACodeStoreType,
+    pub db_name: DBName
 }
 
 impl TestApp {
     pub async fn new() -> Self {
 
-        let pg_pool = configure_postgresql().await;
+        let (pg_pool, db_name) = configure_postgresql().await;
         let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(PostgresUserStore::new(pg_pool))));
         let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));
         let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
@@ -58,7 +62,8 @@ impl TestApp {
             cookie_jar,
             http_client,
             banned_token_store,
-            two_fa_code_store
+            two_fa_code_store,
+            db_name
         }
     }
 
@@ -149,7 +154,19 @@ impl TestApp {
     }
 }
 
-async fn configure_postgresql() -> PgPool {
+impl Drop for TestApp {
+    fn drop(&mut self) {
+        println!("Dropping test db {}!", self.db_name.0);
+        let db_name = self.db_name.0.clone();
+        tokio::task::spawn_blocking(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(async { delete_database(&db_name).await });
+        });
+        println!("Dropped test db!");
+    }
+}
+
+async fn configure_postgresql() -> (PgPool, DBName) {
     let postgresql_conn_url = DATABASE_URL.to_owned();
 
     // We are creating a new database for each test case, and we need to ensure each database has a unique name!
@@ -160,9 +177,11 @@ async fn configure_postgresql() -> PgPool {
     let postgresql_conn_url_with_db = format!("{}/{}", postgresql_conn_url, db_name);
 
     // Create a new connection pool and return it
-    get_postgres_pool(&postgresql_conn_url_with_db)
+    let pg_pool = get_postgres_pool(&postgresql_conn_url_with_db)
         .await
-        .expect("Failed to create Postgres connection pool!")
+        .expect("Failed to create Postgres connection pool!");
+    
+    (pg_pool, DBName(db_name))
 }
 
 async fn configure_database(db_conn_string: &str, db_name: &str) {
@@ -192,4 +211,38 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
         .run(&connection)
         .await
         .expect("Failed to migrate the database");
+}
+
+async fn delete_database(db_name: &str) {
+    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+
+    let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
+        .expect("Failed to parse PostgreSQL connection string");
+
+    let mut connection = PgConnection::connect_with(&connection_options)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    // Kill any active connections to the database
+    connection
+        .execute(
+            format!(
+                r#"
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = '{}'
+                  AND pid <> pg_backend_pid();
+        "#,
+                db_name
+            )
+            .as_str(),
+        )
+        .await
+        .expect("Failed to drop the database.");
+
+    // Drop the database
+    connection
+        .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
+        .await
+        .expect("Failed to drop the database.");
 }

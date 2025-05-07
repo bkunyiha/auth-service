@@ -10,6 +10,10 @@ cd ..
 ```
 
 ## Run servers locally (Manually)
+
+#### Setup Migrations
+cd auth-service && sqlx database create && sqlx migrate run
+
 #### App service
 ```bash
 cd app-service
