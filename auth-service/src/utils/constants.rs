@@ -18,7 +18,7 @@ lazy_static! {
 pub mod env {
     pub const JWT_SECRET_ENV_VAR: &str = "JWT_SECRET";
     pub const APP_SERVICE_HOST_ENV_VAR: &str = "APP_SERVICE_HOST";
-    pub const DB_URL_ENV_VAR: &str = "DB_URL";
+    pub const DB_URL_ENV_VAR: &str = "DATABASE_URL";
 }
 
 // Set the JWT secret from the environment variable

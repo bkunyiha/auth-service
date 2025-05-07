@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::domain::{BannedTokenStore, BannedTokenStoreError};
+use crate::services::{BannedTokenStore, BannedTokenStoreError};
 
 // Create a new struct called `HashsetBannedTokenStore` containing a `token` field
 // which stores a `HashSet`` of token `String`s.

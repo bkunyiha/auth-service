@@ -1,7 +1,7 @@
 use auth_service::{
     Application,
     app_state::{AppState, UserStoreType, BannedTokenStoreType, TwoFACodeStoreType, EmailClientType}, 
-    services::{HashmapUserStore, HashsetBannedTokenStore, HashmapTwoFACodeStore}, 
+    services::{HashsetBannedTokenStore, HashmapTwoFACodeStore, data_stores::PostgresUserStore}, 
     domain::MockEmailClient,
     get_postgres_pool,
 };
@@ -11,12 +11,11 @@ use sqlx::PgPool;
 
 #[tokio::main]
 async fn main() {
-    let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(HashmapUserStore::default())));
+    let pg_pool = configure_postgresql().await;
+    let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(PostgresUserStore::new(pg_pool))));
     let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));
     let two_fa_token_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
     let email_client: EmailClientType = Arc::new(RwLock::new(Box::new(MockEmailClient)));
-    
-    let pg_pool = configure_postgresql().await;
     
     let app_state: AppState = AppState::new(user_store, banned_token_store, two_fa_token_store, email_client);
     

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::domain::data_stores::{
+use crate::services::data_stores::{
     UserStore,
     BannedTokenStore,
     TwoFACodeStore
