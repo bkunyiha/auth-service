@@ -6,7 +6,8 @@ use axum_extra::extract::CookieJar;
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, LoginAttemptId, TwoFACode},    
+    domain::{AuthAPIError, Email},
+    services::{LoginAttemptId, TwoFACode},
     utils::auth::generate_auth_cookie,
 };
 

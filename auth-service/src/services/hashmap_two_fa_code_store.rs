@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use crate::domain::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError,user::Email,};
+use crate::domain::user::Email;
+use crate::services::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError};
 
 #[derive(Default)]
 pub struct HashmapTwoFACodeStore {

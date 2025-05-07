@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     app_state::AppState,
-    domain::{LoginAttemptId, TwoFACode, AuthAPIError, Email, Password, email_client::EmailClient},
+    domain::{AuthAPIError, Email, Password, email_client::EmailClient},
+    services::{LoginAttemptId, TwoFACode},
     utils::auth::generate_auth_cookie,
 };
 

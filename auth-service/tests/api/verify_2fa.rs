@@ -1,5 +1,6 @@
 use crate::helpers::TestApp;
-use auth_service::domain::{Email, LoginAttemptId, TwoFACode};
+use auth_service::domain::Email;
+use auth_service::services::{LoginAttemptId, TwoFACode};
 use auth_service::routes::TwoFactorAuthResponse;
 use serde_json;
 use fake::{faker::internet::en::SafeEmail, faker::internet::en::Password as FakerPassword, Fake};
