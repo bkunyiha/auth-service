@@ -14,6 +14,8 @@ cd ..
 #### Setup Migrations
 cd auth-service && sqlx database create && sqlx migrate run
 
+# docker run --name redis-db -p "6379:6379" -d redis:7.0-alpine
+
 #### App service
 ```bash
 cd app-service

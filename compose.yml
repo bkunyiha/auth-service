@@ -38,7 +38,16 @@ services:
     volumes:
       - db:/var/lib/postgresql/data
     networks:
+      - app-network
+
+  redis:
+    image: redis:7.0-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
       - app-network  
+
   web-server:
     image: nginx:mainline-alpine
     restart: "always" # automatically restart container when server crashes
