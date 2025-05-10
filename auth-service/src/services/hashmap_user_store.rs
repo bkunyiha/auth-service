@@ -61,7 +61,7 @@ impl UserStore for HashmapUserStore {
     }
 }
 
-// TODO: Add unit tests for your `HashmapUserStore` implementation
+// Add unit tests for your `HashmapUserStore` implementation
 #[cfg(test)]
 mod tests {
     use super::*;

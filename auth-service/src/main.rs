@@ -1,9 +1,9 @@
 use auth_service::{
     Application,
     app_state::{AppState, UserStoreType, BannedTokenStoreType, TwoFACodeStoreType, EmailClientType}, 
-    services::{data_stores::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore}}, 
+    services::data_stores::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore}, 
     domain::MockEmailClient,
-    utils::REDIS_HOST_NAME,
+    utils::{DATABASE_URL, REDIS_HOST_NAME},
     get_postgres_pool,
     get_redis_client,
 };
@@ -32,9 +32,8 @@ async fn main() {
 
 async fn configure_postgresql() -> PgPool {
     // Create a new database connection pool
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    let pg_pool = get_postgres_pool(&database_url)
+    let db_url = &DATABASE_URL;
+    let pg_pool = get_postgres_pool(db_url)
         .await
         .expect("Failed to create Postgres connection pool!");
 

@@ -46,12 +46,13 @@ fn set_app_service_host() -> String {
 
 // Set the db url from the environment variable
 fn set_db_url() -> String {
+    
     dotenv().ok(); // Load environment variables
-    let prod_host = std_env::var(env::DB_URL_ENV_VAR).expect("DB_URL must be set.");
-    if prod_host.is_empty() {
+    let db_host = std_env::var(env::DB_URL_ENV_VAR).expect("DB_URL must be set.");
+    if db_host.is_empty() {
         panic!("DB_URL must not be empty.");
     }
-    prod_host
+    db_host
 }
 
 fn set_redis_host() -> String {
