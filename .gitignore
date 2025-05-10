@@ -18,8 +18,9 @@ target/
 # RustRover
 .idea/
 
-# SQLx local migration dir
-.sqlx/
+# Docker mounts
+certbot-etc/
+mount_dir/
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

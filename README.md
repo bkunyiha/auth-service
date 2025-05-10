@@ -12,7 +12,15 @@ cd ..
 ## Run servers locally (Manually)
 
 #### Setup Migrations
-cd auth-service && sqlx database create && sqlx migrate run
+https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#enable-building-in-offline-mode-with-query
+
+docker run --name db -e POSTGRES_PASSWORD={*****SECURE_PASSWORD*****} --volume ./mount_dir/postgres:/var/lib/postgresql/data -p 5432:5432 -d postgres:15.2-alpine
+
+docker run --name redis-db -p "6379:6379" -d redis:7.0-alpine
+
+cd auth-service && sqlx database create && 
+cargo sqlx prepare 
+set SQLX_OFFLINE=true
 
 # docker run --name redis-db -p "6379:6379" -d redis:7.0-alpine
 
