@@ -1,8 +1,9 @@
 use axum::Router;
 use axum::routing::post;
-use tower_http::services::ServeDir;
+use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use crate::app_state::AppState;
-use tower_http::cors::CorsLayer;
+use crate::utils::tracing::{make_span_with_request_id, on_request, on_response};
+
 mod login;
 mod logout;
 mod signup;
@@ -27,4 +28,13 @@ pub fn get_routes(app_state: AppState, cors: CorsLayer) -> Router {
         .fallback_service(ServeDir::new("assets"))
         .with_state(app_state)
         .layer(cors)
+        .layer(
+            // Add a TraceLayer for HTTP requests to enable detailed tracing
+            // This layer will create spans for each request using the make_span_with_request_id function,
+            // and log events at the start and end of each request using on_request and on_response functions.
+            TraceLayer::new_for_http()
+                .make_span_with(make_span_with_request_id)
+                .on_request(on_request)
+                .on_response(on_response),
+        )
 }
