@@ -18,7 +18,9 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         code: TwoFACode,
     ) -> Result<(), TwoFACodeStoreError> {
         if self.codes.contains_key(&email) {
-            return Err(TwoFACodeStoreError::UnexpectedError(eyre!("Email already exists in the store")));
+            return Err(TwoFACodeStoreError::UnexpectedError(eyre!(
+                "Email already exists in the store"
+            )));
         }
         self.codes.insert(email, (login_attempt_id, code));
         Ok(())
@@ -39,23 +41,27 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         &self,
         email: &Email,
     ) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError> {
-        self.codes.get(email).cloned().ok_or(TwoFACodeStoreError::LoginAttemptIdNotFound)
+        self.codes
+            .get(email)
+            .cloned()
+            .ok_or(TwoFACodeStoreError::LoginAttemptIdNotFound)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use super::*;
+    use crate::app_state::TwoFACodeStoreType;
     use crate::domain::user::Email;
     use fake::{faker::internet::en::SafeEmail, Fake};
+    use std::sync::Arc;
     use tokio::sync::RwLock;
-    use crate::app_state::TwoFACodeStoreType;
 
     #[tokio::test]
     async fn test_add_code() {
         //let mut store = HashmapTwoFACodeStore::default();
-        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let two_fa_code_store: TwoFACodeStoreType =
+            Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.to_string()).unwrap();
@@ -63,19 +69,25 @@ mod tests {
         let code = TwoFACode::default();
 
         // First add should succeed
-        assert!(store.add_code(email.clone(), login_attempt_id.clone(), code.clone()).await.is_ok());
+        assert!(store
+            .add_code(email.clone(), login_attempt_id.clone(), code.clone())
+            .await
+            .is_ok());
 
         // Second add with same email should fail
         assert_eq!(
             store.add_code(email, login_attempt_id, code).await,
-            Err(TwoFACodeStoreError::UnexpectedError(eyre!("Email already exists in the store")))
+            Err(TwoFACodeStoreError::UnexpectedError(eyre!(
+                "Email already exists in the store"
+            )))
         );
     }
 
     #[tokio::test]
     async fn test_remove_code() {
         //let mut store = HashmapTwoFACodeStore::default();
-        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let two_fa_code_store: TwoFACodeStoreType =
+            Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.to_string()).unwrap();
@@ -89,7 +101,10 @@ mod tests {
         );
 
         // Add code
-        store.add_code(email.clone(), login_attempt_id, code).await.unwrap();
+        store
+            .add_code(email.clone(), login_attempt_id, code)
+            .await
+            .unwrap();
 
         // Remove existing code should succeed
         assert!(store.remove_code(&email).await.is_ok());
@@ -104,7 +119,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_code() {
         //let mut store = HashmapTwoFACodeStore::default();
-        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
+        let two_fa_code_store: TwoFACodeStoreType =
+            Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.to_string()).unwrap();
@@ -118,7 +134,10 @@ mod tests {
         );
 
         // Add code
-        store.add_code(email.clone(), login_attempt_id.clone(), code.clone()).await.unwrap();
+        store
+            .add_code(email.clone(), login_attempt_id.clone(), code.clone())
+            .await
+            .unwrap();
 
         // Get existing code should succeed
         let result = store.get_code(&email).await;

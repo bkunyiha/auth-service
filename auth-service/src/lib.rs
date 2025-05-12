@@ -1,23 +1,23 @@
-use std::error::Error;
+use app_state::AppState;
 use axum::{
+    http::Method,
     http::StatusCode,
     response::{IntoResponse, Response},
     serve::Serve,
     Json, Router,
-    http::Method,
 };
-use app_state::AppState;
 use domain::AuthAPIError;
+use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
+use sqlx::{postgres::PgPoolOptions, PgPool};
+use std::error::Error;
 use tower_http::cors::CorsLayer;
 use utils::constants::APP_SERVICE_HOST;
-use sqlx::{PgPool, postgres::PgPoolOptions};
-use redis::{Client, RedisResult};
 
-pub mod routes;
-pub mod domain;
-pub mod services;
 pub mod app_state;
+pub mod domain;
+pub mod routes;
+pub mod services;
 pub mod utils;
 
 #[derive(Serialize, Deserialize)]
@@ -31,7 +31,9 @@ impl IntoResponse for AuthAPIError {
         let (status, error_message) = match self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
-            AuthAPIError::IncorrectCredentials |  AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Incorrect credentials"),
+            AuthAPIError::IncorrectCredentials | AuthAPIError::InvalidToken => {
+                (StatusCode::UNAUTHORIZED, "Incorrect credentials")
+            }
             AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing JWT Token"),
             AuthAPIError::UnexpectedError(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
@@ -68,7 +70,6 @@ pub struct Application {
 
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
-
         // Allow the app service(running on our local machine and in production) to call the auth service
         let allowed_origins = [
             "http://localhost:8000".parse()?,
@@ -87,7 +88,7 @@ impl Application {
         let server = axum::serve(listener, routes::get_routes(app_state, cors));
 
         // Create a new Application instance and return it
-        Ok(Application{server,address})
+        Ok(Application { server, address })
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {

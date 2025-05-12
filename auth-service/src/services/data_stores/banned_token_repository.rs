@@ -22,10 +22,16 @@ impl PartialEq for BannedTokenStoreError {
     fn eq(&self, other: &Self) -> bool {
         matches!(
             (self, other),
-            (BannedTokenStoreError::TokenAlreadyExists, BannedTokenStoreError::TokenAlreadyExists) |
-            (BannedTokenStoreError::TokenNotFound, BannedTokenStoreError::TokenNotFound) |
-            (BannedTokenStoreError::UnexpectedError(_), BannedTokenStoreError::UnexpectedError(_))
+            (
+                BannedTokenStoreError::TokenAlreadyExists,
+                BannedTokenStoreError::TokenAlreadyExists
+            ) | (
+                BannedTokenStoreError::TokenNotFound,
+                BannedTokenStoreError::TokenNotFound
+            ) | (
+                BannedTokenStoreError::UnexpectedError(_),
+                BannedTokenStoreError::UnexpectedError(_)
+            )
         )
     }
 }
-

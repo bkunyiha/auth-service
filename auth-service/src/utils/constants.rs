@@ -37,7 +37,8 @@ fn set_token() -> String {
 // Set the app host from the environment variable
 fn set_app_service_host() -> String {
     dotenv().ok(); // Load environment variables
-    let prod_host = std_env::var(env::APP_SERVICE_HOST_ENV_VAR).expect("APP_SERVICE_HOST must be set.");
+    let prod_host =
+        std_env::var(env::APP_SERVICE_HOST_ENV_VAR).expect("APP_SERVICE_HOST must be set.");
     if prod_host.is_empty() {
         panic!("APP_SERVICE_HOST must not be empty.");
     }
@@ -46,7 +47,6 @@ fn set_app_service_host() -> String {
 
 // Set the db url from the environment variable
 fn set_db_url() -> String {
-    
     dotenv().ok(); // Load environment variables
     let db_host = std_env::var(env::DB_URL_ENV_VAR).expect("DB_URL must be set.");
     if db_host.is_empty() {

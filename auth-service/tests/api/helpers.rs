@@ -1,19 +1,23 @@
-use std::str::FromStr;
 use auth_service::{
-    Application,
-    app_state::{AppState, UserStoreType, BannedTokenStoreType, TwoFACodeStoreType, EmailClientType},
+    app_state::{
+        AppState, BannedTokenStoreType, EmailClientType, TwoFACodeStoreType, UserStoreType,
+    },
+    domain::MockEmailClient,
+    get_postgres_pool, get_redis_client,
     services::data_stores::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore},
     utils::constants::{test, DATABASE_URL, REDIS_HOST_NAME},
-    domain::MockEmailClient,
-    get_postgres_pool,
-    get_redis_client,
+    Application,
 };
+use std::str::FromStr;
 
+use reqwest::cookie::Jar;
+use serde_json::json;
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    Connection, Executor, PgConnection, PgPool,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde_json::json;
-use reqwest::cookie::Jar;
-use sqlx::{PgPool, postgres::{PgPoolOptions, PgConnectOptions}, PgConnection, Executor, Connection};
 use uuid::Uuid;
 
 pub struct DBName(String);
@@ -24,22 +28,29 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFACodeStoreType,
-    pub db_name: DBName
+    pub db_name: DBName,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
-
         let (pg_pool, db_name) = configure_postgresql().await;
-        let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(PostgresUserStore::new(pg_pool))));        
-        let banned_token_store: BannedTokenStoreType = 
-            Arc::new(RwLock::new(Box::new(RedisBannedTokenStore::new(Arc::new(RwLock::new(configure_redis()))))));
-        let two_fa_code_store: TwoFACodeStoreType = 
-            Arc::new(RwLock::new(Box::new(RedisTwoFACodeStore::new(Arc::new(RwLock::new(configure_redis()))))));
- 
+        let user_store: UserStoreType =
+            Arc::new(RwLock::new(Box::new(PostgresUserStore::new(pg_pool))));
+        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(Box::new(
+            RedisBannedTokenStore::new(Arc::new(RwLock::new(configure_redis()))),
+        )));
+        let two_fa_code_store: TwoFACodeStoreType = Arc::new(RwLock::new(Box::new(
+            RedisTwoFACodeStore::new(Arc::new(RwLock::new(configure_redis()))),
+        )));
+
         let email_client: EmailClientType = Arc::new(RwLock::new(Box::new(MockEmailClient)));
 
-        let app_state: AppState = AppState::new(user_store, banned_token_store.clone(), two_fa_code_store.clone(), email_client.clone());
+        let app_state: AppState = AppState::new(
+            user_store,
+            banned_token_store.clone(),
+            two_fa_code_store.clone(),
+            email_client.clone(),
+        );
 
         let app = Application::build(app_state, test::APP_SERVICE_HOST)
             .await
@@ -50,7 +61,7 @@ impl TestApp {
         // Run the auth service in a separate async task
         // to avoid blocking the main test thread.
         // This is a new feature in Rust 1.71.0
-        // and is not yet available in the stable version of Rust.        
+        // and is not yet available in the stable version of Rust.
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 
@@ -67,7 +78,7 @@ impl TestApp {
             http_client,
             banned_token_store,
             two_fa_code_store,
-            db_name
+            db_name,
         }
     }
 
@@ -184,7 +195,7 @@ async fn configure_postgresql() -> (PgPool, DBName) {
     let pg_pool = get_postgres_pool(&postgresql_conn_url_with_db)
         .await
         .expect("Failed to create Postgres connection pool!");
-    
+
     (pg_pool, DBName(db_name))
 }
 
@@ -200,7 +211,6 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
         .execute(format!(r#"CREATE DATABASE "{}";"#, db_name).as_str())
         .await
         .expect("Failed to create database.");
-
 
     // Connect to new database
     let db_conn_string = format!("{}/{}", db_conn_string, db_name);

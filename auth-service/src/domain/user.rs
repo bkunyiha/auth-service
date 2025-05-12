@@ -1,26 +1,26 @@
-use validator::Validate;
 use color_eyre::eyre::{eyre, Context, Result};
+use validator::Validate;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Validate)]
-pub struct Email{
+pub struct Email {
     #[validate(email)]
-    email: String
+    email: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Validate)]
-pub struct Password{
+pub struct Password {
     #[validate(length(min = 8))]
-    password: String
+    password: String,
 }
 
 impl Email {
-    pub fn parse(email: String) -> Result<Self>  {
-       let email = Email {email};
-       email
-       .validate()
-       .wrap_err(format!("Invalid email format: {}", email.email))?;
-       //.map_err(|_| eyre!("Invalid email format: {}", email.email))?;
-       //.map_err(|_| "Invalid email format".to_string())?;
+    pub fn parse(email: String) -> Result<Self> {
+        let email = Email { email };
+        email
+            .validate()
+            .wrap_err(format!("Invalid email format: {}", email.email))?;
+        //.map_err(|_| eyre!("Invalid email format: {}", email.email))?;
+        //.map_err(|_| "Invalid email format".to_string())?;
 
         Ok(email)
     }
@@ -30,8 +30,8 @@ impl Email {
     }
 }
 
-// The AsRef trait is used to convert a reference of one type to a reference of another type. 
-// In this case, we're implementing the AsRef trait for the Email type to allow us to convert a &Email to a &str. 
+// The AsRef trait is used to convert a reference of one type to a reference of another type.
+// In this case, we're implementing the AsRef trait for the Email type to allow us to convert a &Email to a &str.
 // This is useful when we want to expose the inner email string in a read-only manner.
 impl AsRef<str> for Email {
     fn as_ref(&self) -> &str {
@@ -41,31 +41,29 @@ impl AsRef<str> for Email {
 
 impl Password {
     pub fn parse(password: String) -> Result<Self> {
-        let password = Password{password};
-        password
-        .validate()
-        .map_err(|e| eyre!(e))?;
+        let password = Password { password };
+        password.validate().map_err(|e| eyre!(e))?;
         //.map_err(|_| "Invalid password format".to_string())?;
 
         Ok(password)
     }
 
     pub fn to_str(&self) -> &str {
-    "******"
-    }   
-}
-
-// The AsRef trait is used to convert a reference of one type to a reference of another type. In this case, 
-// we're implementing the AsRef trait for the Password type to allow us to convert a &Password to a &str. 
-// This is useful when we want to expose the inner password string in a read-only manner.
-impl AsRef<str> for Password {
-    fn as_ref(&self) -> &str {
-    &self.password
+        "******"
     }
 }
 
-// The User struct should contain 3 fields. email, which is a String; 
-// password, which is also a String; and requires_2fa, which is a boolean. 
+// The AsRef trait is used to convert a reference of one type to a reference of another type. In this case,
+// we're implementing the AsRef trait for the Password type to allow us to convert a &Password to a &str.
+// This is useful when we want to expose the inner password string in a read-only manner.
+impl AsRef<str> for Password {
+    fn as_ref(&self) -> &str {
+        &self.password
+    }
+}
+
+// The User struct should contain 3 fields. email, which is a String;
+// password, which is also a String; and requires_2fa, which is a boolean.
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 pub struct User {
     pub email: Email,
@@ -75,15 +73,21 @@ pub struct User {
 
 impl User {
     pub fn new(email: Email, password: Password, requires_2fa: bool) -> Self {
-        Self { email, password, requires_2fa }
+        Self {
+            email,
+            password,
+            requires_2fa,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fake::{faker::{internet::en::SafeEmail, internet::en::Password as FakerPassword}, Fake};
-    
+    use fake::{
+        faker::{internet::en::Password as FakerPassword, internet::en::SafeEmail},
+        Fake,
+    };
 
     #[test]
     fn test_email_parse() {
@@ -103,10 +107,10 @@ mod tests {
         let email = Email::parse("test".to_string());
         assert!(matches!(email, Err(_)));
     }
-    
+
     #[test]
     fn test_password_parse() {
-        let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
+        let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
         let password = Password::parse(password_str.clone());
         assert!(matches!(password, Ok(p) if p.password == password_str));
     }
@@ -129,27 +133,27 @@ mod tests {
         let password_str: String = SafeEmail().fake();
         let password = Password::parse(password_str).unwrap();
         let user = User::new(email.clone(), password, false);
-        assert_eq!(user.email, email);  
+        assert_eq!(user.email, email);
     }
 
     #[test]
     fn test_user_new_invalid_email() {
         let email = Email::parse("invalid-email".to_string());
         assert!(matches!(email, Err(_)));
-    }   
+    }
 
     #[test]
     fn test_user_new_invalid_password() {
         let password = Password::parse("short".to_string());
         assert!(matches!(password, Err(_)));
     }
- 
+
     #[test]
     fn test_user_new_empty_email() {
         let email = Email::parse("".to_string());
         assert!(matches!(email, Err(_)));
     }
- 
+
     #[test]
     fn test_user_new_empty_password() {
         let password = Password::parse("".to_string());

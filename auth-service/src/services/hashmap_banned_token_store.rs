@@ -1,10 +1,10 @@
-use std::collections::HashSet;
 use crate::services::{BannedTokenStore, BannedTokenStoreError};
+use std::collections::HashSet;
 
 // Create a new struct called `HashsetBannedTokenStore` containing a `token` field
 // which stores a `HashSet`` of token `String`s.
 // Derive the `Default` trait for `HashsetBannedTokenStore`.
-#[derive(Clone,Default)]
+#[derive(Clone, Default)]
 pub struct HashsetBannedTokenStore {
     tokens: HashSet<String>,
 }
@@ -28,9 +28,11 @@ impl HashsetBannedTokenStore {
     // Return `BannedTokenStoreError::TokenNotFound` if the token can not be found.
     #[tracing::instrument(name = "Getting BannedToken From Local MemoryCache", skip_all)]
     pub fn get_token(&self, token: &str) -> Result<String, BannedTokenStoreError> {
-        self.tokens.get(token).map(|s| s.to_string()).ok_or(BannedTokenStoreError::TokenNotFound)
+        self.tokens
+            .get(token)
+            .map(|s| s.to_string())
+            .ok_or(BannedTokenStoreError::TokenNotFound)
     }
-
 }
 
 #[async_trait::async_trait]
@@ -85,5 +87,4 @@ mod tests {
         assert!(result.is_ok());
         assert!(!result.unwrap());
     }
-    
 }

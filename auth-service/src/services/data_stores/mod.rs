@@ -5,12 +5,7 @@ pub mod banned_token_repository;
 pub use banned_token_repository::{BannedTokenStore, BannedTokenStoreError};
 
 pub mod two_factor_repository;
-pub use two_factor_repository::{
-    TwoFACodeStore,
-    TwoFACodeStoreError,
-    LoginAttemptId,
-    TwoFACode
-};
+pub use two_factor_repository::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError};
 
 pub mod postgres_user_store;
 pub use postgres_user_store::PostgresUserStore;

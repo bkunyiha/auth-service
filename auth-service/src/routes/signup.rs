@@ -1,16 +1,20 @@
-use axum::{extract::State, http::StatusCode, response::IntoResponse, extract::Json, debug_handler};
-use serde::{Deserialize, Serialize};
 use crate::app_state::AppState;
-use crate::domain::{AuthAPIError, User, Email, Password};
+use crate::domain::{AuthAPIError, Email, Password, User};
+use axum::{
+    debug_handler, extract::Json, extract::State, http::StatusCode, response::IntoResponse,
+};
+use serde::{Deserialize, Serialize};
 
 #[debug_handler]
 #[tracing::instrument(name = "Signup", skip_all)]
-pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupRequest>) 
-    -> impl IntoResponse {
-
+pub async fn signup(
+    State(state): State<AppState>,
+    Json(request): Json<SignupRequest>,
+) -> impl IntoResponse {
     let email = Email::parse(request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
-    let password = Password::parse(request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
-    
+    let password =
+        Password::parse(request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
+
     let mut user_store = state.user_store.write().await;
 
     if user_store.get_user(&email).await.is_ok() {
@@ -40,7 +44,11 @@ pub struct SignupRequest {
 
 impl SignupRequest {
     pub fn new(email: String, password: String, requires_2fa: bool) -> Self {
-        Self { email, password, requires_2fa }
+        Self {
+            email,
+            password,
+            requires_2fa,
+        }
     }
 }
 
