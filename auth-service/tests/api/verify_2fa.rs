@@ -1,10 +1,9 @@
 use crate::helpers::TestApp;
 use auth_service::domain::Email;
-use auth_service::services::{LoginAttemptId, TwoFACode};
 use auth_service::routes::TwoFactorAuthResponse;
+use auth_service::services::{LoginAttemptId, TwoFACode};
+use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
 use serde_json;
-use fake::{faker::internet::en::SafeEmail, faker::internet::en::Password as FakerPassword, Fake};
-
 
 #[tokio::test]
 async fn verify_2fa_returns_200() {
@@ -12,7 +11,7 @@ async fn verify_2fa_returns_200() {
 
     let email_str: String = SafeEmail().fake();
     let email = Email::parse(email_str.clone()).unwrap();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
 
     // signup a new user with 2FA enabled
     let signup_request = serde_json::json!({
@@ -30,12 +29,12 @@ async fn verify_2fa_returns_200() {
         "password": password_str,
     });
     let response = app.post_login(&login_request).await;
-    
+
     let json_body = response
         .json::<TwoFactorAuthResponse>()
         .await
         .expect("Could not deserialize response body to TwoFactorAuthResponse");
-    
+
     assert_eq!(json_body.message, "2FA required".to_owned());
 
     // Since you can only have one mutable RWLock then, wrap the code in a block to drop lock
@@ -52,8 +51,7 @@ async fn verify_2fa_returns_200() {
         assert_eq!(json_body.login_attempt_id, stored_login_attempt_id.as_ref());
     }
 
-
-    // Verify 2 FA Auth 
+    // Verify 2 FA Auth
     let request = serde_json::json!({
         "email": email_str.clone(),
         "loginAttemptId": stored_login_attempt_id.as_ref(),
@@ -79,7 +77,7 @@ async fn should_return_422_if_malformed_input() {
 async fn should_return_400_if_invalid_input() {
     let app = TestApp::new().await;
     let email_str: String = SafeEmail().fake();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
 
     // signup a new user with 2FA enabled
     let signup_request = serde_json::json!({
@@ -97,12 +95,12 @@ async fn should_return_400_if_invalid_input() {
         "password": password_str,
     });
     let response = app.post_login(&login_request).await;
-    
+
     response
         .json::<TwoFactorAuthResponse>()
         .await
         .expect("Could not deserialize response body to TwoFactorAuthResponse");
-    
+
     // Try to verify with incorrect login attempt ID
     let request = serde_json::json!({
         "email": email_str,
@@ -118,7 +116,7 @@ async fn should_return_400_if_invalid_input() {
 async fn should_return_401_if_incorrect_credentials() {
     let app = TestApp::new().await;
     let email_str: String = SafeEmail().fake();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
 
     // signup a new user with 2FA enabled
     let signup_request = serde_json::json!({
@@ -136,12 +134,12 @@ async fn should_return_401_if_incorrect_credentials() {
         "password": password_str,
     });
     let response = app.post_login(&login_request).await;
-    
+
     let json_body = response
         .json::<TwoFactorAuthResponse>()
         .await
         .expect("Could not deserialize response body to TwoFactorAuthResponse");
-    
+
     // Try to verify with incorrect 2FA code
     let request = serde_json::json!({
         "email": email_str,
@@ -157,7 +155,7 @@ async fn should_return_401_if_incorrect_credentials() {
 async fn should_return_401_if_old_code() {
     let app = TestApp::new().await;
     let email_str: String = SafeEmail().fake();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
 
     // 1) signup a new user with 2FA enabled
     let signup_request = serde_json::json!({
@@ -187,7 +185,12 @@ async fn should_return_401_if_old_code() {
     // 3) Get the first 2FA code from store
     let email = Email::parse(email_str.clone()).unwrap();
     let (_, two_factor_code) = app
-        .two_fa_code_store.read().await.get_code(&email).await.unwrap();
+        .two_fa_code_store
+        .read()
+        .await
+        .get_code(&email)
+        .await
+        .unwrap();
     //let (_, two_factor_code) = two_fa_store.get_code(&email).await.unwrap();
     // 4) Verify with the 2FA code
 

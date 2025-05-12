@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use serde::Deserialize;
 
-use axum::{extract::State, extract::Json, debug_handler};
+use axum::{debug_handler, extract::Json, extract::State};
 use axum_extra::extract::CookieJar;
 
 use crate::{
@@ -18,7 +18,6 @@ pub async fn verify_2fa(
     jar: CookieJar,
     Json(request): Json<Verify2FARequest>,
 ) -> (CookieJar, Result<StatusCode, AuthAPIError>) {
-
     let email = match Email::parse(request.email) {
         Ok(email) => email,
         Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
@@ -38,8 +37,10 @@ pub async fn verify_2fa(
         // in the request body matches values in the `code_tuple`.
         // If not, return a `AuthAPIError::IncorrectCredentials`.
         let _ = match two_fa_code_store.get_code(&email).await {
-            Ok((id, code)) if id == login_attempt_id && code == two_fa_code  => (),
-            Ok((id, _)) if id != login_attempt_id  => return (jar, Err(AuthAPIError::InvalidCredentials)),
+            Ok((id, code)) if id == login_attempt_id && code == two_fa_code => (),
+            Ok((id, _)) if id != login_attempt_id => {
+                return (jar, Err(AuthAPIError::InvalidCredentials))
+            }
             Ok(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
             Err(_) => return (jar, Err(AuthAPIError::InvalidToken)),
         };
@@ -71,11 +72,14 @@ pub struct Verify2FARequest {
     pub login_attempt_id: String,
     #[serde(rename = "2FACode")]
     pub two_fa_code: String,
-    
 }
 
 impl Verify2FARequest {
     pub fn new(email: String, login_attempt_id: String, two_fa_code: String) -> Self {
-        Self { email, login_attempt_id, two_fa_code}
+        Self {
+            email,
+            login_attempt_id,
+            two_fa_code,
+        }
     }
 }

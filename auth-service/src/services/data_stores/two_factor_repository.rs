@@ -1,8 +1,8 @@
 use crate::domain::Email;
-use uuid::Uuid;
-use rand::Rng;
 use color_eyre::eyre::{eyre, Context, Report, Result};
+use rand::Rng;
 use thiserror::Error;
+use uuid::Uuid;
 
 // This trait represents the interface all concrete 2FA code stores should implement
 #[async_trait::async_trait]
@@ -33,7 +33,7 @@ impl PartialEq for TwoFACodeStoreError {
         matches!(
             (self, other),
             (Self::LoginAttemptIdNotFound, Self::LoginAttemptIdNotFound)
-            | (Self::UnexpectedError(_), Self::UnexpectedError(_))
+                | (Self::UnexpectedError(_), Self::UnexpectedError(_))
         )
     }
 }
@@ -43,8 +43,7 @@ pub struct LoginAttemptId(String);
 
 impl LoginAttemptId {
     pub fn parse(id: String) -> Result<Self> {
-        let parsed_id = uuid::Uuid::parse_str(&id)
-            .wrap_err("Invalid login attempt id")?;
+        let parsed_id = uuid::Uuid::parse_str(&id).wrap_err("Invalid login attempt id")?;
         Ok(Self(parsed_id.to_string()))
     }
 }

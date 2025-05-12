@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use color_eyre::eyre::{eyre, Context, Result};
 use redis::{Commands, Connection};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use color_eyre::eyre::{eyre, Context, Result};
 
 use crate::{
     domain::Email,
@@ -77,11 +77,11 @@ impl TwoFACodeStore for RedisTwoFACodeStore {
                     .wrap_err("failed to deserialize 2FA tuple")
                     .map_err(TwoFACodeStoreError::UnexpectedError)?;
 
-                let login_attempt_id =
-                    LoginAttemptId::parse(data.0).map_err(|e| TwoFACodeStoreError::UnexpectedError(eyre!(e)))?;
+                let login_attempt_id = LoginAttemptId::parse(data.0)
+                    .map_err(|e| TwoFACodeStoreError::UnexpectedError(eyre!(e)))?;
 
-                let email_code =
-                    TwoFACode::parse(data.1).map_err(|e| TwoFACodeStoreError::UnexpectedError(eyre!(e)))?;
+                let email_code = TwoFACode::parse(data.1)
+                    .map_err(|e| TwoFACodeStoreError::UnexpectedError(eyre!(e)))?;
 
                 Ok((login_attempt_id, email_code))
             }

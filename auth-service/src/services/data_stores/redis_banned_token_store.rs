@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use redis::{Commands, Connection, RedisResult};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::{
@@ -25,10 +25,10 @@ impl BannedTokenStore for RedisBannedTokenStore {
         // 1. Create a new key using the get_key helper function.
         let token_key = get_key(&token);
         let value = true;
-        // 2. Call the set_ex command on the Redis connection to set a new key/value pair with an expiration time (TTL). 
+        // 2. Call the set_ex command on the Redis connection to set a new key/value pair with an expiration time (TTL).
         // The value should simply be a `true` (boolean value).
         // The expiration time should be set to TOKEN_TTL_SECONDS.
-        // NOTE: The TTL is expected to be a u64 so you will have to cast TOKEN_TTL_SECONDS to a u64. 
+        // NOTE: The TTL is expected to be a u64 so you will have to cast TOKEN_TTL_SECONDS to a u64.
         // Return BannedTokenStoreError::UnexpectedError if casting fails or the call to set_ex fails.
         let ttl: u64 = TOKEN_TTL_SECONDS
             .try_into()

@@ -1,11 +1,7 @@
+use crate::domain::MockEmailClient;
+use crate::services::data_stores::{BannedTokenStore, TwoFACodeStore, UserStore};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::services::data_stores::{
-    UserStore,
-    BannedTokenStore,
-    TwoFACodeStore
-};
-use crate::domain::MockEmailClient;
 
 // Using a type alias to improve readability!
 pub type UserStoreType = Arc<RwLock<Box<dyn UserStore>>>;
@@ -23,14 +19,14 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(
-        user_store: UserStoreType, 
+        user_store: UserStoreType,
         banned_token_store: BannedTokenStoreType,
         two_fa_code_store: TwoFACodeStoreType,
         email_client: EmailClientType,
     ) -> Self {
-        Self { 
-            user_store, 
-            banned_token_store, 
+        Self {
+            user_store,
+            banned_token_store,
             two_fa_code_store,
             email_client,
         }

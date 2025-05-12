@@ -1,11 +1,11 @@
+use crate::domain::{Email, Password, User};
+use crate::services::{UserStore, UserStoreError};
 use std::collections::HashMap;
-use crate::domain::{User, Email, Password};
-use crate::services::{UserStoreError, UserStore};
 
 // Create a new struct called `HashmapUserStore` containing a `users` field
 // which stores a `HashMap`` of email `String`s mapped to `User` objects.
 // Derive the `Default` trait for `HashmapUserStore`.
-#[derive(Clone,Default)]
+#[derive(Clone, Default)]
 pub struct HashmapUserStore {
     users: HashMap<Email, User>,
 }
@@ -45,7 +45,6 @@ impl HashmapUserStore {
         }
         Ok(())
     }
-
 }
 
 #[async_trait::async_trait]
@@ -58,7 +57,11 @@ impl UserStore for HashmapUserStore {
         self.get_user(email).cloned()
     }
 
-    async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError> {
+    async fn validate_user(
+        &self,
+        email: &Email,
+        password: &Password,
+    ) -> Result<(), UserStoreError> {
         self.validate_user(email, password)
     }
 }

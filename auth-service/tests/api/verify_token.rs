@@ -1,15 +1,15 @@
 use super::helpers::TestApp;
-use serde_json::json;
-use fake::{faker::internet::en::SafeEmail, faker::internet::en::Password as FakerPassword, Fake};
 use auth_service::utils::constants::JWT_COOKIE_NAME;
+use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
+use serde_json::json;
 
 #[tokio::test]
 async fn verify_token_returns_200() {
     let app = TestApp::new().await;
 
     let email_str: String = SafeEmail().fake();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
-       
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
+
     // Signup a new user
     let signup_request = serde_json::json!({
         "email": email_str,
@@ -58,8 +58,8 @@ async fn should_return_401_if_invalid_token() {
     let app = TestApp::new().await;
 
     let email_str: String = SafeEmail().fake();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
-       
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
+
     // Signup a new user
     let signup_request = serde_json::json!({
         "email": email_str,
@@ -78,9 +78,11 @@ async fn should_return_401_if_invalid_token() {
     assert_eq!(response.status().as_u16(), 200);
 
     // Set the auth cookie to an invalid token
-    let response = app.post_verify_token(&json!({
-        "token": "invalid_token"
-    })).await;
+    let response = app
+        .post_verify_token(&json!({
+            "token": "invalid_token"
+        }))
+        .await;
 
     assert_eq!(response.status().as_u16(), 401);
 }
@@ -90,8 +92,8 @@ async fn should_return_401_if_banned_token() {
     let app = TestApp::new().await;
 
     let email_str: String = SafeEmail().fake();
-    let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
-       
+    let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
+
     // Signup a new user
     let signup_request = serde_json::json!({
         "email": email_str,

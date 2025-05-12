@@ -1,11 +1,11 @@
-use axum::{extract::State, http::StatusCode, extract::Json, debug_handler};
+use axum::{debug_handler, extract::Json, extract::State, http::StatusCode};
 use axum_extra::extract::CookieJar;
-use serde::{Deserialize, Serialize};
 use color_eyre::eyre::{eyre, Result};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, Password, email_client::EmailClient},
+    domain::{email_client::EmailClient, AuthAPIError, Email, Password},
     services::{LoginAttemptId, TwoFACode},
     utils::auth::generate_auth_cookie,
 };
@@ -16,8 +16,10 @@ pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
     Json(request): Json<LoginRequest>,
-) -> (CookieJar, Result<(StatusCode, Json<LoginResponse>), AuthAPIError>) {
-
+) -> (
+    CookieJar,
+    Result<(StatusCode, Json<LoginResponse>), AuthAPIError>,
+) {
     let email = match Email::parse(request.email) {
         Ok(email) => email,
         Err(_) => return (jar, Err(AuthAPIError::InvalidCredentials)),
@@ -68,7 +70,6 @@ async fn handle_2fa(
         .await
         .add_code(email.clone(), login_attempt_id.clone(), tw_code.clone())
         .await
-        
     {
         return (jar, Err(AuthAPIError::UnexpectedError(e.into())));
     }
@@ -84,24 +85,29 @@ async fn handle_2fa(
         return (jar, Err(AuthAPIError::UnexpectedError(eyre!(e))));
     }
 
-    // Return 
+    // Return
     let response = TwoFactorAuthResponse {
         message,
         login_attempt_id: login_attempt_id.as_ref().to_string(),
     };
 
     (
-        jar, 
-        Ok((StatusCode::PARTIAL_CONTENT, Json(LoginResponse::TwoFactorAuth(response))))
+        jar,
+        Ok((
+            StatusCode::PARTIAL_CONTENT,
+            Json(LoginResponse::TwoFactorAuth(response)),
+        )),
     )
 }
-
 
 #[tracing::instrument(skip_all)]
 async fn handle_no_2fa(
     email: &Email,
     jar: CookieJar,
-) -> (CookieJar, Result<(StatusCode, Json<LoginResponse>), AuthAPIError>) {
+) -> (
+    CookieJar,
+    Result<(StatusCode, Json<LoginResponse>), AuthAPIError>,
+) {
     let auth_cookie = match generate_auth_cookie(&email) {
         Ok(cookie) => cookie,
         Err(e) => return (jar, Err(AuthAPIError::UnexpectedError(e.into()))),
@@ -109,7 +115,10 @@ async fn handle_no_2fa(
     let updated_jar = jar.add(auth_cookie);
 
     // Return the updated cookie jar and a 200 status code
-    (updated_jar, Ok((StatusCode::OK, Json(LoginResponse::RegularAuth))))
+    (
+        updated_jar,
+        Ok((StatusCode::OK, Json(LoginResponse::RegularAuth))),
+    )
 }
 
 #[derive(Deserialize, Debug)]

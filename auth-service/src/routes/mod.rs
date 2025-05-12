@@ -1,8 +1,8 @@
-use axum::Router;
-use axum::routing::post;
-use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use crate::app_state::AppState;
 use crate::utils::tracing::{make_span_with_request_id, on_request, on_response};
+use axum::routing::post;
+use axum::Router;
+use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
 mod login;
 mod logout;
@@ -18,7 +18,6 @@ pub use verify_2fa::*;
 pub use verify_token::*;
 
 pub fn get_routes(app_state: AppState, cors: CorsLayer) -> Router {
-    
     Router::new()
         .route("/signup", post(signup))
         .route("/login", post(login))
