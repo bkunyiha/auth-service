@@ -1,4 +1,5 @@
 use validator::Validate;
+use color_eyre::eyre::{eyre, Context, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Validate)]
 pub struct Email{
@@ -13,9 +14,13 @@ pub struct Password{
 }
 
 impl Email {
-    pub fn parse(email: String) -> Result<Self, String>  {
+    pub fn parse(email: String) -> Result<Self>  {
        let email = Email {email};
-       email.validate().map_err(|_| "Invalid email format".to_string())?;
+       email
+       .validate()
+       .wrap_err(format!("Invalid email format: {}", email.email))?;
+       //.map_err(|_| eyre!("Invalid email format: {}", email.email))?;
+       //.map_err(|_| "Invalid email format".to_string())?;
 
         Ok(email)
     }
@@ -35,9 +40,12 @@ impl AsRef<str> for Email {
 }
 
 impl Password {
-    pub fn parse(password: String) -> Result<Self, String> {
+    pub fn parse(password: String) -> Result<Self> {
         let password = Password{password};
-        password.validate().map_err(|_| "Invalid password format".to_string())?;
+        password
+        .validate()
+        .map_err(|e| eyre!(e))?;
+        //.map_err(|_| "Invalid password format".to_string())?;
 
         Ok(password)
     }
@@ -75,50 +83,50 @@ impl User {
 mod tests {
     use super::*;
     use fake::{faker::{internet::en::SafeEmail, internet::en::Password as FakerPassword}, Fake};
+    
 
     #[test]
     fn test_email_parse() {
         let email_str: String = SafeEmail().fake();
         let email = Email::parse(email_str.clone());
-        assert_eq!(email, Ok(Email{email: email_str}));
+        assert!(matches!(email, Ok(e) if e.email == email_str));
     }
 
     #[test]
     fn test_email_parse_empty() {
         let email = Email::parse("".to_string());
-        assert_eq!(email, Err("Invalid email format".to_string()));
+        assert!(matches!(email, Err(_)));
     }
 
     #[test]
     fn test_email_parse_invalid() {
         let email = Email::parse("test".to_string());
-        assert_eq!(email, Err("Invalid email format".to_string()));
+        assert!(matches!(email, Err(_)));
     }
     
     #[test]
     fn test_password_parse() {
         let password_str: String = FakerPassword(std::ops::Range {start: 8, end: 30}).fake();
         let password = Password::parse(password_str.clone());
-        assert_eq!(password, Ok(Password{ password:password_str}));
+        assert!(matches!(password, Ok(p) if p.password == password_str));
     }
 
     #[test]
     fn test_password_parse_empty() {
         let password = Password::parse("".to_string());
-        assert_eq!(password, Err("Invalid password format".to_string()));
+        assert!(matches!(password, Err(_)));
     }
 
     #[test]
     fn test_password_parse_short() {
         let password = Password::parse("short".to_string());
-        assert_eq!(password, Err("Invalid password format".to_string()));
+        assert!(matches!(password, Err(_)));
     }
 
     #[test]
     fn test_user_new() {
         let email = Email::parse("test@example.com".to_string()).unwrap();
         let password_str: String = SafeEmail().fake();
-
         let password = Password::parse(password_str).unwrap();
         let user = User::new(email.clone(), password, false);
         assert_eq!(user.email, email);  
@@ -127,24 +135,24 @@ mod tests {
     #[test]
     fn test_user_new_invalid_email() {
         let email = Email::parse("invalid-email".to_string());
-        assert_eq!(email, Err("Invalid email format".to_string()));
+        assert!(matches!(email, Err(_)));
     }   
 
     #[test]
     fn test_user_new_invalid_password() {
         let password = Password::parse("short".to_string());
-        assert_eq!(password, Err("Invalid password format".to_string()));
+        assert!(matches!(password, Err(_)));
     }
  
     #[test]
     fn test_user_new_empty_email() {
         let email = Email::parse("".to_string());
-        assert_eq!(email, Err("Invalid email format".to_string()));
+        assert!(matches!(email, Err(_)));
     }
  
     #[test]
     fn test_user_new_empty_password() {
         let password = Password::parse("".to_string());
-        assert_eq!(password, Err("Invalid password format".to_string()));
+        assert!(matches!(password, Err(_)));
     }
 }

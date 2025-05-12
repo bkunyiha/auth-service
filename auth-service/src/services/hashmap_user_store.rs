@@ -11,8 +11,8 @@ pub struct HashmapUserStore {
 }
 
 impl HashmapUserStore {
+    #[tracing::instrument(name = "Adding User To User Local MemoryCache", skip_all)]
     pub fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        // Return `UserStoreError::UserAlreadyExists` if the user already exists,
         // otherwise insert the user into the hashmap and return `Ok(())`.
         if self.users.contains_key(&user.email) {
             return Err(UserStoreError::UserAlreadyExists);
@@ -26,6 +26,7 @@ impl HashmapUserStore {
     // This function should return a `Result` type containing either a
     // `User` object or a `UserStoreError`.
     // Return `UserStoreError::UserNotFound` if the user can not be found.
+    #[tracing::instrument(name = "Getting User From User Local MemoryCache", skip_all)]
     pub fn get_user(&self, email: &Email) -> Result<&User, UserStoreError> {
         self.users.get(email).ok_or(UserStoreError::UserNotFound)
     }
@@ -36,6 +37,7 @@ impl HashmapUserStore {
     // unit type `()` if the email/password passed in match an existing user, or a `UserStoreError`.
     // Return `UserStoreError::UserNotFound` if the user can not be found.
     // Return `UserStoreError::InvalidCredentials` if the password is incorrect.
+    #[tracing::instrument(name = "Validating User using Local MemoryCache", skip_all)]
     pub fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError> {
         let user = self.get_user(email)?;
         if user.password != *password {

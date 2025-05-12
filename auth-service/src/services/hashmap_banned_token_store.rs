@@ -10,6 +10,7 @@ pub struct HashsetBannedTokenStore {
 }
 
 impl HashsetBannedTokenStore {
+    #[tracing::instrument(name = "Adding BannedToken To Local MemoryCache", skip_all)]
     pub fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError> {
         // Return `BannedTokenStoreError::TokenAlreadyExists` if the user already exists,
         // otherwise insert the user into the HashSet and return `Ok(())`.
@@ -25,6 +26,7 @@ impl HashsetBannedTokenStore {
     // This function should return a `Result` type containing either a
     // `token` String or a `BannedTokenStoreError`.
     // Return `BannedTokenStoreError::TokenNotFound` if the token can not be found.
+    #[tracing::instrument(name = "Getting BannedToken From Local MemoryCache", skip_all)]
     pub fn get_token(&self, token: &str) -> Result<String, BannedTokenStoreError> {
         self.tokens.get(token).map(|s| s.to_string()).ok_or(BannedTokenStoreError::TokenNotFound)
     }

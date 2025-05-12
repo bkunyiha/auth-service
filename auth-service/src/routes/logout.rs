@@ -8,6 +8,7 @@ use crate::{
     app_state::AppState,
 };
 
+#[tracing::instrument(skip_all)]
 pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> (CookieJar, Result<impl IntoResponse, AuthAPIError>) {
     // Retrieve JWT cookie from the `CookieJar`
     // Return AuthAPIError::MissingToken is the cookie is not found
@@ -21,7 +22,7 @@ pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> (CookieJar
     // Validate JWT token by calling `validate_token` from the auth service.
     // If the token is valid you can ignore the returned claims for now.
     // Return AuthAPIError::InvalidToken is validation fails.
-    let _ = match validate_token(&token).await {
+    let _ = match validate_token(&token, state.banned_token_store.clone()).await {
         Ok(_) => (),
         Err(_) => return (jar, Err(AuthAPIError::InvalidToken)),
     };

@@ -1,3 +1,6 @@
+use color_eyre::eyre::Report;
+use thiserror::Error;
+
 #[async_trait::async_trait]
 pub trait BannedTokenStore: Send + Sync {
     async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError>;
@@ -5,9 +8,24 @@ pub trait BannedTokenStore: Send + Sync {
     async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error)]
 pub enum BannedTokenStoreError {
+    #[error("Token already exists")]
     TokenAlreadyExists,
+    #[error("Token not found")]
     TokenNotFound,
-    UnexpectedError,
+    #[error("Unexpected error: {0}")]
+    UnexpectedError(#[source] Report),
 }
+
+impl PartialEq for BannedTokenStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (BannedTokenStoreError::TokenAlreadyExists, BannedTokenStoreError::TokenAlreadyExists) |
+            (BannedTokenStoreError::TokenNotFound, BannedTokenStoreError::TokenNotFound) |
+            (BannedTokenStoreError::UnexpectedError(_), BannedTokenStoreError::UnexpectedError(_))
+        )
+    }
+}
+
