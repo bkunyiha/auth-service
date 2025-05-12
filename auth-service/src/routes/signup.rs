@@ -4,8 +4,9 @@ use crate::app_state::AppState;
 use crate::domain::{AuthAPIError, User, Email, Password};
 
 #[debug_handler]
-#[tracing::instrument(name = "Signup", skip_all, err(Debug))]
-pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupRequest>) -> impl IntoResponse {
+#[tracing::instrument(name = "Signup", skip_all)]
+pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupRequest>) 
+    -> impl IntoResponse {
 
     let email = Email::parse(request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let password = Password::parse(request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
@@ -18,8 +19,8 @@ pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupReq
 
     let user = User::new(email, password, request.requires_2fa);
 
-    if user_store.add_user(user).await.is_err() {
-        return Err(AuthAPIError::UnexpectedError);
+    if let Err(e) = user_store.add_user(user).await {
+        return Err(AuthAPIError::UnexpectedError(e.into()));
     }
 
     let response = Json(SignupResponse {

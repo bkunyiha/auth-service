@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use crate::domain::{Email, Password, User};
 use crate::services::data_stores::{UserStore, UserStoreError};
 use argon2::password_hash::rand_core::OsRng;
+use color_eyre::eyre::{eyre, Context, Result};
 
 pub struct DBUser {
     pub email: String,
@@ -41,7 +42,7 @@ impl UserStore for PostgresUserStore {
         // Hash the password before storing
         let password_hash = compute_password_hash(user.password.as_ref().to_owned())
             .await
-            .map_err(|_| UserStoreError::UnexpectedError)?;
+            .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
 
         // Insert the new user
         sqlx::query!(
@@ -53,7 +54,8 @@ impl UserStore for PostgresUserStore {
         )
         .execute(&self.pool)
         .await
-        .map_err(|_| UserStoreError::UnexpectedError)?;
+        .map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
+        //.map_err(UserStoreError::UnexpectedError)?;
 
         Ok(())
     }
@@ -66,11 +68,14 @@ impl UserStore for PostgresUserStore {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|_| UserStoreError::UnexpectedError)?;
+        .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
 
         match user {
             Some(db_user) => {
-                let user = User::new(email.clone(), Password::parse("xxxxxxxxxx".to_string()).unwrap(), db_user.requires_2fa);
+                let user = User::new(
+                    email.clone(), 
+                    Password::parse("xxxxxxxxxx".to_string()).map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
+                    db_user.requires_2fa);
                 Ok(user)
             },
             None => Err(UserStoreError::UserNotFound),
@@ -85,7 +90,7 @@ impl UserStore for PostgresUserStore {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|_| UserStoreError::UnexpectedError)?;
+        .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
 
         match user {
             Some(user) => {
@@ -126,7 +131,7 @@ async fn verify_password_hash_other(
 async fn verify_password_hash(
     expected_password_hash: String,
     password_candidate: String,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<()> {
     // This line retrieves the current span from the tracing context. 
     // The span represents the execution context for the compute_password_hash function.
     let current_span: tracing::Span = tracing::Span::current();
@@ -139,7 +144,8 @@ async fn verify_password_hash(
 
             Argon2::default()
                 .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-                .map_err(|e| e.into())
+                .wrap_err("failed to verify password hash")
+                //.map_err(|e| e.into())
         })
     })
     .await;

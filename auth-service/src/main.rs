@@ -14,7 +14,9 @@ use auth_service::utils::init_tracing;
 
 #[tokio::main]
 async fn main() {
-    init_tracing();
+    color_eyre::install().expect("Failed to install color_eyre");
+    init_tracing().expect("Failed to initialize tracing");
+    
     let pg_pool = configure_postgresql().await;
     let user_store: UserStoreType = Arc::new(RwLock::new(Box::new(PostgresUserStore::new(pg_pool))));
     let banned_token_store: BannedTokenStoreType = 

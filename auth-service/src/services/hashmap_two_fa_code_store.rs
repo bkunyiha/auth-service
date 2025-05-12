@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::domain::user::Email;
 use crate::services::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError};
-
+use color_eyre::eyre::eyre;
 #[derive(Default)]
 pub struct HashmapTwoFACodeStore {
     codes: HashMap<Email, (LoginAttemptId, TwoFACode)>,
@@ -10,6 +10,7 @@ pub struct HashmapTwoFACodeStore {
 
 #[async_trait::async_trait]
 impl TwoFACodeStore for HashmapTwoFACodeStore {
+    #[tracing::instrument(name = "Adding 2-FA-Code To Local Memery 2FA-Code Cache", skip_all)]
     async fn add_code(
         &mut self,
         email: Email,
@@ -17,12 +18,13 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         code: TwoFACode,
     ) -> Result<(), TwoFACodeStoreError> {
         if self.codes.contains_key(&email) {
-            return Err(TwoFACodeStoreError::UnexpectedError);
+            return Err(TwoFACodeStoreError::UnexpectedError(eyre!("Email already exists in the store")));
         }
         self.codes.insert(email, (login_attempt_id, code));
         Ok(())
     }
 
+    #[tracing::instrument(name = "Removing 2-FA-Code From Local Memery 2FA-Code Cache", skip_all)]
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError> {
         if self.codes.contains_key(&email) {
             self.codes.remove(&email);
@@ -32,6 +34,7 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         }
     }
 
+    #[tracing::instrument(name = "Getting 2-FA-Code From Local Memery 2FA-Code Cache", skip_all)]
     async fn get_code(
         &self,
         email: &Email,
@@ -65,7 +68,7 @@ mod tests {
         // Second add with same email should fail
         assert_eq!(
             store.add_code(email, login_attempt_id, code).await,
-            Err(TwoFACodeStoreError::UnexpectedError)
+            Err(TwoFACodeStoreError::UnexpectedError(eyre!("Email already exists in the store")))
         );
     }
 

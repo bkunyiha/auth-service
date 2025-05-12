@@ -146,7 +146,7 @@ async fn should_return_401_if_incorrect_credentials() {
     let request = serde_json::json!({
         "email": email_str,
         "loginAttemptId": json_body.login_attempt_id,
-        "2FACode": "000000"  // Incorrect code
+        "2FACode": "111111"  // Valid But Incorrect code
     });
 
     let response = app.post_verify_2fa(&request).await;
