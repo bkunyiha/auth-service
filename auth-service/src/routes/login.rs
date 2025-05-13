@@ -1,6 +1,7 @@
 use axum::{debug_handler, extract::Json, extract::State, http::StatusCode};
 use axum_extra::extract::CookieJar;
 use color_eyre::eyre::{eyre, Result};
+use secrecy::Secret;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -121,15 +122,18 @@ async fn handle_no_2fa(
     )
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 pub struct LoginRequest {
-    pub email: String,
-    pub password: String,
+    email: String,
+    password: Secret<String>,
 }
 
 impl LoginRequest {
     pub fn new(email: String, password: String) -> Self {
-        Self { email, password }
+        Self {
+            email,
+            password: Secret::new(password),
+        }
     }
 }
 
