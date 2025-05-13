@@ -11,6 +11,7 @@ use crate::domain::{Email, Password, User};
 use crate::services::data_stores::{UserStore, UserStoreError};
 use argon2::password_hash::rand_core::OsRng;
 use color_eyre::eyre::{eyre, Context, Result};
+use secrecy::{ExposeSecret, Secret};
 
 pub struct DBUser {
     pub email: String,
@@ -39,9 +40,11 @@ impl UserStore for PostgresUserStore {
         };
 
         // Hash the password before storing
-        let password_hash = compute_password_hash(user.password.as_ref().to_owned())
-            .await
-            .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
+        let password_hash = compute_password_hash(Secret::new(
+            user.password.as_ref().expose_secret().to_owned(),
+        ))
+        .await
+        .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
 
         // Insert the new user
         sqlx::query!(
@@ -60,7 +63,7 @@ impl UserStore for PostgresUserStore {
 
     #[tracing::instrument(name = "Retrieving user from PostgreSQL", skip_all)]
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
-        let user = sqlx::query_as!(
+        let user_maybe = sqlx::query_as!(
             DBUser,
             "SELECT email, password_hash, requires_2fa FROM users WHERE email = $1",
             email.as_ref()
@@ -69,11 +72,11 @@ impl UserStore for PostgresUserStore {
         .await
         .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
 
-        match user {
+        match user_maybe {
             Some(db_user) => {
                 let user = User::new(
                     email.clone(),
-                    Password::parse("xxxxxxxxxx".to_string())
+                    Password::parse(Secret::new(db_user.password_hash))
                         .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
                     db_user.requires_2fa,
                 );
@@ -99,9 +102,12 @@ impl UserStore for PostgresUserStore {
 
         match user {
             Some(user) => {
-                verify_password_hash(user.password_hash, password.as_ref().to_owned())
-                    .await
-                    .map_err(|_| UserStoreError::InvalidCredentials)?;
+                verify_password_hash(
+                    user.password_hash,
+                    password.as_ref().expose_secret().to_owned(),
+                )
+                .await
+                .map_err(|_| UserStoreError::InvalidCredentials)?;
                 Ok(())
             }
             None => Err(UserStoreError::UserNotFound),
@@ -166,7 +172,9 @@ async fn verify_password_hash(
 // separate thread pool using tokio::task::spawn_blocking. Note that you
 // will need to update the input parameters to be String types instead of &str
 #[tracing::instrument(name = "Computing password hash", skip_all)]
-async fn compute_password_hash(password: String) -> Result<String, Box<dyn Error + Send + Sync>> {
+async fn compute_password_hash(
+    password: Secret<String>,
+) -> Result<String, Box<dyn Error + Send + Sync>> {
     let current_span: tracing::Span = tracing::Span::current();
     let result = tokio::task::spawn_blocking(move || {
         current_span.in_scope(|| {
@@ -176,7 +184,7 @@ async fn compute_password_hash(password: String) -> Result<String, Box<dyn Error
                 Version::V0x13,
                 Params::new(15000, 2, 1, None)?,
             )
-            .hash_password(password.as_bytes(), &salt)?
+            .hash_password(password.expose_secret().as_bytes(), &salt)?
             .to_string();
 
             Ok(password_hash)
