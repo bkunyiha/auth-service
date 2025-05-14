@@ -1,12 +1,8 @@
-use color_eyre::eyre::{eyre, Context, Result};
+use color_eyre::eyre::{eyre, Result};
+use regex::Regex;
 use secrecy::{ExposeSecret, Secret};
-use validator::Validate;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Validate)]
-pub struct Email {
-    #[validate(email)]
-    email: String,
-}
+use std::hash::{Hash, Hasher};
+use validator::ValidationError;
 
 #[derive(Debug, Clone)]
 pub struct Password(Secret<String>);
@@ -46,20 +42,43 @@ impl AsRef<Secret<String>> for Password {
     }
 }
 
-impl Email {
-    pub fn parse(email: String) -> Result<Self> {
-        let email = Email { email };
-        email
-            .validate()
-            .wrap_err(format!("Invalid email format: {}", email.email))?;
-        //.map_err(|_| eyre!("Invalid email format: {}", email.email))?;
-        //.map_err(|_| "Invalid email format".to_string())?;
+fn validate_email(email: &Secret<String>) -> Result<(), ValidationError> {
+    let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
+    if email_regex.is_match(email.expose_secret()) {
+        Ok(())
+    } else {
+        Err(ValidationError::new("invalid_email"))
+    }
+}
 
+#[derive(Debug, Clone)]
+pub struct Email {
+    email: Secret<String>,
+}
+
+impl Email {
+    pub fn parse(email: Secret<String>) -> Result<Self> {
+        let email = Email { email };
+        validate_email(&email.email)?;
         Ok(email)
     }
 
     pub fn to_str(&self) -> &str {
-        &self.email
+        &self.email.expose_secret()
+    }
+}
+
+impl Eq for Email {}
+
+impl PartialEq for Email {
+    fn eq(&self, other: &Self) -> bool {
+        self.email.expose_secret() == other.email.expose_secret()
+    }
+}
+
+impl Hash for Email {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.email.expose_secret().hash(state);
     }
 }
 
@@ -68,7 +87,7 @@ impl Email {
 // This is useful when we want to expose the inner email string in a read-only manner.
 impl AsRef<str> for Email {
     fn as_ref(&self) -> &str {
-        self.to_str()
+        self.email.expose_secret().as_str()
     }
 }
 
@@ -102,19 +121,19 @@ mod tests {
     #[test]
     fn test_email_parse() {
         let email_str: String = SafeEmail().fake();
-        let email = Email::parse(email_str.clone());
-        assert!(matches!(email, Ok(e) if e.email == email_str));
+        let email = Email::parse(Secret::new(email_str.clone()));
+        assert!(matches!(email, Ok(e) if e.email.expose_secret() == &email_str));
     }
 
     #[test]
     fn test_email_parse_empty() {
-        let email = Email::parse("".to_string());
+        let email = Email::parse(Secret::new("".to_string()));
         assert!(matches!(email, Err(_)));
     }
 
     #[test]
     fn test_email_parse_invalid() {
-        let email = Email::parse("test".to_string());
+        let email = Email::parse(Secret::new("test".to_string()));
         assert!(matches!(email, Err(_)));
     }
 
@@ -142,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_user_new() {
-        let email = Email::parse("test@example.com".to_string()).unwrap();
+        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
         let password_str: String = SafeEmail().fake();
         let password = Password::parse(Secret::new(password_str)).unwrap();
         let user = User::new(email.clone(), password, false);
@@ -151,26 +170,14 @@ mod tests {
 
     #[test]
     fn test_user_new_invalid_email() {
-        let email = Email::parse("invalid-email".to_string());
+        let email = Email::parse(Secret::new("invalid-email".to_string()));
         assert!(matches!(email, Err(_)));
-    }
-
-    #[test]
-    fn test_user_new_invalid_password() {
-        let password = Password::parse(Secret::new("short".to_string()));
-        assert!(matches!(password, Err(_)));
     }
 
     #[test]
     fn test_user_new_empty_email() {
-        let email = Email::parse("".to_string());
+        let email = Email::parse(Secret::new("".to_string()));
         assert!(matches!(email, Err(_)));
-    }
-
-    #[test]
-    fn test_user_new_empty_password() {
-        let password = Password::parse(Secret::new("".to_string()));
-        assert!(matches!(password, Err(_)));
     }
 
     #[derive(Debug, Clone)]

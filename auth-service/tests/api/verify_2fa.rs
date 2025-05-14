@@ -3,6 +3,7 @@ use auth_service::domain::Email;
 use auth_service::routes::TwoFactorAuthResponse;
 use auth_service::services::{LoginAttemptId, TwoFACode};
 use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
+use secrecy::Secret;
 use serde_json;
 
 #[tokio::test]
@@ -10,7 +11,7 @@ async fn verify_2fa_returns_200() {
     let app = TestApp::new().await;
 
     let email_str: String = SafeEmail().fake();
-    let email = Email::parse(email_str.clone()).unwrap();
+    let email = Email::parse(Secret::new(email_str.clone())).unwrap();
     let password_str: String = FakerPassword(std::ops::Range { start: 8, end: 30 }).fake();
 
     // signup a new user with 2FA enabled
@@ -183,7 +184,7 @@ async fn should_return_401_if_old_code() {
     // two_fa_code_store.read()
     // *************************
     // 3) Get the first 2FA code from store
-    let email = Email::parse(email_str.clone()).unwrap();
+    let email = Email::parse(Secret::new(email_str.clone())).unwrap();
     let (_, two_factor_code) = app
         .two_fa_code_store
         .read()

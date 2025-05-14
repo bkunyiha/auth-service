@@ -124,14 +124,14 @@ async fn handle_no_2fa(
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
-    email: String,
+    email: Secret<String>,
     password: Secret<String>,
 }
 
 impl LoginRequest {
     pub fn new(email: String, password: String) -> Self {
         Self {
-            email,
+            email: Secret::new(email),
             password: Secret::new(password),
         }
     }

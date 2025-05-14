@@ -2,6 +2,7 @@ use crate::helpers::TestApp;
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 use auth_service::{domain::Email, routes::TwoFactorAuthResponse};
 use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
+use secrecy::Secret;
 
 #[tokio::test]
 async fn should_return_200_if_valid_credentials() {
@@ -161,7 +162,7 @@ async fn should_return_2fa_required_message_when_2fa_enabled() {
 
     // assert that `json_body.login_attempt_id` is stored inside `app.two_fa_code_store`
     let two_fa_store = app.two_fa_code_store.read().await;
-    let email = Email::parse(email_str).unwrap();
+    let email = Email::parse(Secret::new(email_str)).unwrap();
     let (stored_login_attempt_id, _) = two_fa_store.get_code(&email).await.unwrap();
     assert_eq!(json_body.login_attempt_id, stored_login_attempt_id.as_ref());
 }
