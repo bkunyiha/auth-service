@@ -26,7 +26,9 @@ lazy_static = "1.4.0"
 rand = "0.9.1"
 thiserror = "2.0.12"
 color-eyre = "0.6.3"
+regex = "1.10.0"
 secrecy = { version = "0.8.0", features = ["serde"] }
+reqwest = { version = "0.12.15", default-features = false, features = ["json", "rustls-tls", "cookies"] }
 
 # runtime-tokio-rustls: Use the tokio runtime and rustls TLS backend (SOFT-DEPRECATED).
 sqlx = { version = "0.8", features = [ "runtime-tokio-rustls", "postgres", "migrate", "macros"] }
@@ -34,8 +36,8 @@ argon2 = { version = "0.5.3", features = ["std"] }
 redis = { version = "0.31.0", features = ["tokio-comp"] }
 
 [dev-dependencies]
-reqwest = { version = "0.12.15", default-features = false, features = ["json", "cookies"] }
 serde_json = "1.0"
 fake = { version = "4", features = ["derive"] }
 quickcheck = "1.0.3"
 quickcheck_macros = "1.0.0"
+wiremock = "0.6.0"

@@ -37,7 +37,7 @@ pub async fn signup(
 
 #[derive(Deserialize, Debug)]
 pub struct SignupRequest {
-    pub email: String,
+    pub email: Secret<String>,
     pub password: Secret<String>,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
@@ -46,7 +46,7 @@ pub struct SignupRequest {
 impl SignupRequest {
     pub fn new(email: String, password: String, requires_2fa: bool) -> Self {
         Self {
-            email,
+            email: Secret::new(email),
             password: Secret::new(password),
             requires_2fa,
         }

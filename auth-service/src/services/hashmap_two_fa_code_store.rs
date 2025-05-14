@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::domain::user::Email;
 use crate::services::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError};
 use color_eyre::eyre::eyre;
+
 #[derive(Default)]
 pub struct HashmapTwoFACodeStore {
     codes: HashMap<Email, (LoginAttemptId, TwoFACode)>,
@@ -54,6 +55,7 @@ mod tests {
     use crate::app_state::TwoFACodeStoreType;
     use crate::domain::user::Email;
     use fake::{faker::internet::en::SafeEmail, Fake};
+    use secrecy::Secret;
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
@@ -63,8 +65,8 @@ mod tests {
         let two_fa_code_store: TwoFACodeStoreType =
             Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
-        let email_str: String = SafeEmail().fake();
-        let email = Email::parse(email_str.to_string()).unwrap();
+        let email_secret: Secret<String> = Secret::new(SafeEmail().fake());
+        let email = Email::parse(email_secret).unwrap();
         let login_attempt_id = LoginAttemptId::default();
         let code = TwoFACode::default();
 
@@ -85,12 +87,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_remove_code() {
-        //let mut store = HashmapTwoFACodeStore::default();
         let two_fa_code_store: TwoFACodeStoreType =
             Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
-        let email_str: String = SafeEmail().fake();
-        let email = Email::parse(email_str.to_string()).unwrap();
+        let email = Email::parse(Secret::new(SafeEmail().fake())).unwrap();
         let login_attempt_id = LoginAttemptId::default();
         let code = TwoFACode::default();
 
@@ -118,12 +118,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_code() {
-        //let mut store = HashmapTwoFACodeStore::default();
         let two_fa_code_store: TwoFACodeStoreType =
             Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
-        let email_str: String = SafeEmail().fake();
-        let email = Email::parse(email_str.to_string()).unwrap();
+        let email = Email::parse(Secret::new(SafeEmail().fake())).unwrap();
         let login_attempt_id = LoginAttemptId::default();
         let code = TwoFACode::default();
 

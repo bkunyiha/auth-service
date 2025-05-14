@@ -101,12 +101,13 @@ mod tests {
     use super::*;
     use crate::services::HashsetBannedTokenStore;
     use chrono::Utc;
+    use secrecy::Secret;
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
         let cookie = generate_auth_cookie(&email).unwrap();
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
@@ -128,14 +129,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_token() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
         let result = generate_auth_token(&email).unwrap();
         assert_eq!(result.split('.').count(), 3);
     }
 
     #[tokio::test]
     async fn test_validate_token_with_valid_token() {
-        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
         let token = generate_auth_token(&email).unwrap();
         let banned_token_store: BannedTokenStoreType =
             Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));

@@ -1,4 +1,5 @@
 use axum::http::StatusCode;
+use secrecy::Secret;
 use serde::Deserialize;
 
 use axum::{debug_handler, extract::Json, extract::State};
@@ -67,7 +68,7 @@ pub async fn verify_2fa(
 
 #[derive(Deserialize, Debug)]
 pub struct Verify2FARequest {
-    pub email: String,
+    pub email: Secret<String>,
     #[serde(rename = "loginAttemptId")]
     pub login_attempt_id: String,
     #[serde(rename = "2FACode")]
@@ -77,7 +78,7 @@ pub struct Verify2FARequest {
 impl Verify2FARequest {
     pub fn new(email: String, login_attempt_id: String, two_fa_code: String) -> Self {
         Self {
-            email,
+            email: Secret::new(email),
             login_attempt_id,
             two_fa_code,
         }
