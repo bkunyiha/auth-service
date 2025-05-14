@@ -100,10 +100,10 @@ volumes:
       o: bind        # Bind mount type
   dhparam:
     driver: local
-    driver_opts:
-      type: none
-      device: ./mount_dir/dhparam/
-      o: bind
+    #driver_opts:
+    #  type: none
+    #  device: ./mount_dir/dhparam/
+    #  o: bind
   db:
     driver: local
     driver_opts:
