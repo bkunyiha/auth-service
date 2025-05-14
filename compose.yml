@@ -98,12 +98,12 @@ volumes:
       type: none     # Direct mount (no special filesystem)
       device: ./mount_dir/auth-service/html/  # Source path on host
       o: bind        # Bind mount type
-  #dhparam:
-  #  driver: local
-    #driver_opts:
-    #  type: none
-    #  device: ./mount_dir/dhparam/
-    #  o: bind
+  dhparam:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./mount_dir/dhparam/
+      o: bind
   db:
     driver: local
     driver_opts:
