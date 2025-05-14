@@ -1,14 +1,18 @@
+use auth_service::domain::Email;
 use auth_service::{
     app_state::{
         AppState, BannedTokenStoreType, EmailClientType, TwoFACodeStoreType, UserStoreType,
     },
-    domain::MockEmailClient,
     get_postgres_pool, get_redis_client,
     services::data_stores::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore},
+    services::postmark_email_client::PostmarkEmailClient,
     utils::constants::{test, DATABASE_URL, REDIS_HOST_NAME},
     Application,
 };
+use reqwest::Client;
+use secrecy::Secret;
 use std::str::FromStr;
+use wiremock::MockServer;
 
 use reqwest::cookie::Jar;
 use serde_json::json;
@@ -28,6 +32,7 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: TwoFACodeStoreType,
+    pub email_server: MockServer,
     pub db_name: DBName,
 }
 
@@ -43,7 +48,12 @@ impl TestApp {
             RedisTwoFACodeStore::new(Arc::new(RwLock::new(configure_redis()))),
         )));
 
-        let email_client: EmailClientType = Arc::new(RwLock::new(Box::new(MockEmailClient)));
+        // Set up a mock email server
+        let email_server = MockServer::start().await; // New!
+        let base_url = email_server.uri(); // New!
+        let email_client: EmailClientType = Arc::new(RwLock::new(Box::new(
+            configure_postmark_email_client(base_url),
+        ))); //
 
         let app_state: AppState = AppState::new(
             user_store,
@@ -78,6 +88,7 @@ impl TestApp {
             http_client,
             banned_token_store,
             two_fa_code_store,
+            email_server,
             db_name,
         }
     }
@@ -225,6 +236,19 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
         .run(&connection)
         .await
         .expect("Failed to migrate the database");
+}
+
+fn configure_postmark_email_client(base_url: String) -> PostmarkEmailClient {
+    let postmark_auth_token = Secret::new("auth_token".to_owned());
+
+    let sender = Email::parse(Secret::new(test::email_client::SENDER.to_owned())).unwrap();
+
+    let http_client = Client::builder()
+        .timeout(test::email_client::TIMEOUT)
+        .build()
+        .expect("Failed to build HTTP client");
+
+    PostmarkEmailClient::new(base_url, sender, postmark_auth_token, http_client)
 }
 
 async fn delete_database(db_name: &str) {

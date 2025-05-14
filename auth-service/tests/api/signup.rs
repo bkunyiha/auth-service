@@ -2,7 +2,7 @@ use crate::helpers::TestApp;
 use auth_service::{routes::SignupResponse, ErrorResponse};
 use fake::{faker::internet::en::SafeEmail, Fake};
 
-// TODO: Implement tests for all other routes (signup, login, logout, verify-2fa, and verify-token)
+// Implement tests for all other routes (signup, login, logout, verify-2fa, and verify-token)
 #[tokio::test]
 async fn signup_returns_200_for_valid_credentials() {
     let app = TestApp::new().await;
