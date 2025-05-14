@@ -1,5 +1,5 @@
-use crate::domain::MockEmailClient;
 use crate::services::data_stores::{BannedTokenStore, TwoFACodeStore, UserStore};
+use crate::services::postmark_email_client::PostmarkEmailClient;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 pub type UserStoreType = Arc<RwLock<Box<dyn UserStore>>>;
 pub type BannedTokenStoreType = Arc<RwLock<Box<dyn BannedTokenStore>>>;
 pub type TwoFACodeStoreType = Arc<RwLock<Box<dyn TwoFACodeStore>>>;
-pub type EmailClientType = Arc<RwLock<Box<MockEmailClient>>>;
+pub type EmailClientType = Arc<RwLock<Box<PostmarkEmailClient>>>;
 
 #[derive(Clone)]
 pub struct AppState {

@@ -12,3 +12,6 @@ pub use data_stores::{
     BannedTokenStore, BannedTokenStoreError, LoginAttemptId, TwoFACode, TwoFACodeStore,
     TwoFACodeStoreError, UserStore, UserStoreError,
 };
+
+pub mod postmark_email_client;
+pub use postmark_email_client::PostmarkEmailClient;

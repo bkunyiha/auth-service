@@ -123,6 +123,10 @@ jobs:
           export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}          
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
           export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
+          export EMAIL_SERVICE_HOST=${{ vars.EMAIL_SERVICE_HOST }}
+          export EMAIL_FROM_USER=${{ vars.EMAIL_FROM_USER }}
+          export EMAIL_TIMEOUT_MILLIS=${{ vars.EMAIL_TIMEOUT_MILLIS }}
           docker compose down
           docker compose pull
           docker compose up -d

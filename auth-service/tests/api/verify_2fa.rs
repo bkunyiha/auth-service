@@ -5,6 +5,8 @@ use auth_service::services::{LoginAttemptId, TwoFACode};
 use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
 use secrecy::Secret;
 use serde_json;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
 async fn verify_2fa_returns_200() {
@@ -23,6 +25,13 @@ async fn verify_2fa_returns_200() {
 
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
 
     // login the user
     let login_request = serde_json::json!({
@@ -90,6 +99,13 @@ async fn should_return_400_if_invalid_input() {
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
 
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
     // login the user
     let login_request = serde_json::json!({
         "email": email_str,
@@ -129,6 +145,13 @@ async fn should_return_401_if_incorrect_credentials() {
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
 
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
     // login the user
     let login_request = serde_json::json!({
         "email": email_str,
@@ -167,6 +190,13 @@ async fn should_return_401_if_old_code() {
 
     let response = app.post_signup(&signup_request).await;
     assert_eq!(response.status().as_u16(), 201);
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
 
     // 2) Login
     let login_request = serde_json::json!({

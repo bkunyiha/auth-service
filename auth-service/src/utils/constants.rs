@@ -5,8 +5,53 @@ use std::env as std_env;
 pub const JWT_COOKIE_NAME: &str = "jwt";
 pub const DEFAULT_REDIS_HOSTNAME: &str = "127.0.0.1";
 
+pub mod prod {
+    use super::dotenv;
+    use super::env;
+    use super::std_env;
+    pub const APP_ADDRESS: &str = "0.0.0.0:3000";
+
+    pub mod email_client {
+        use lazy_static::lazy_static;
+        use std::time::Duration;
+
+        lazy_static! {
+            pub static ref BASE_URL: String = super::set_email_service_host();
+            pub static ref SENDER: String = super::set_email_from_user();
+            pub static ref TIMEOUT: Duration =
+                std::time::Duration::from_millis(super::set_email_timeout_millis() as u64);
+        }
+    }
+
+    fn set_email_service_host() -> String {
+        dotenv().ok();
+        std_env::var(env::EMAIL_SERVICE_HOST_ENV_VAR)
+            .expect("EMAIL_SERVICE_HOST_ENV_VAR must be set.")
+    }
+
+    fn set_email_from_user() -> String {
+        dotenv().ok();
+        std_env::var(env::EMAIL_FROM_USER_ENV_VAR).expect("EMAIL_FROM_USER_ENV_VAR must be set.")
+    }
+
+    fn set_email_timeout_millis() -> i32 {
+        dotenv().ok();
+        std_env::var(env::EMAIL_TIMEOUT_MILLIS_ENV_VAR)
+            .expect("EMAIL_TIMEOUT_MILLIS must be set.")
+            .parse()
+            .expect("EMAIL_TIMEOUT_MILLIS must be a number")
+    }
+}
+
 pub mod test {
     pub const APP_SERVICE_HOST: &str = "127.0.0.1:0";
+    pub const APP_ADDRESS: &str = "127.0.0.1:0";
+    pub mod email_client {
+        use std::time::Duration;
+
+        pub const SENDER: &str = "test@email.com";
+        pub const TIMEOUT: Duration = std::time::Duration::from_millis(200);
+    }
 }
 
 // Define a lazily evaluated static. lazy_static is needed because std_env::var is not a const function.
@@ -22,6 +67,9 @@ pub mod env {
     pub const APP_SERVICE_HOST_ENV_VAR: &str = "APP_SERVICE_HOST";
     pub const DB_URL_ENV_VAR: &str = "DATABASE_URL";
     pub const REDIS_HOST_NAME_ENV_VAR: &str = "REDIS_HOST_NAME";
+    pub const EMAIL_SERVICE_HOST_ENV_VAR: &str = "EMAIL_SERVICE_HOST";
+    pub const EMAIL_FROM_USER_ENV_VAR: &str = "EMAIL_FROM_USER";
+    pub const EMAIL_TIMEOUT_MILLIS_ENV_VAR: &str = "EMAIL_TIMEOUT_MILLIS";
 }
 
 // Set the JWT secret from the environment variable
