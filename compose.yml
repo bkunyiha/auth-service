@@ -64,7 +64,7 @@ services:
       - ./nginx-conf:/etc/nginx/conf.d # mount nginx-conf volume to /etc/nginx/conf.d
       - ./certbot-etc:/etc/letsencrypt # mount certbot-etc volume(Let’s Encrypt certificates and keys) to /etc/letsencrypt
       - ./certbot-var:/var/lib/letsencrypt # mount certbot-var volume(Let’s Encrypt’s default working directory) to /var/lib/letsencrypt
-      - ./dhparam:/etc/ssl/certs
+      - dhparam:/etc/ssl/certs
     depends_on:
       auth-service:
         condition: service_started
