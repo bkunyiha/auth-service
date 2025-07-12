@@ -31,7 +31,7 @@ pub async fn login(
     };
 
     let user_store = state.user_store.read().await;
-    let _ = match user_store.validate_user(&email, &password).await {
+    match user_store.validate_user(&email, &password).await {
         Ok(_) => (),
         Err(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
     };
@@ -109,9 +109,9 @@ async fn handle_no_2fa(
     CookieJar,
     Result<(StatusCode, Json<LoginResponse>), AuthAPIError>,
 ) {
-    let auth_cookie = match generate_auth_cookie(&email) {
+    let auth_cookie = match generate_auth_cookie(email) {
         Ok(cookie) => cookie,
-        Err(e) => return (jar, Err(AuthAPIError::UnexpectedError(e.into()))),
+        Err(e) => return (jar, Err(AuthAPIError::UnexpectedError(e))),
     };
     let updated_jar = jar.add(auth_cookie);
 

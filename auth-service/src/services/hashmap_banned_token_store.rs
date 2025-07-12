@@ -41,7 +41,7 @@ impl BannedTokenStore for HashsetBannedTokenStore {
         self.add_token(token)
     }
 
-    async fn get_token(&self, token: &String) -> Result<String, BannedTokenStoreError> {
+    async fn get_token(&self, token: &str) -> Result<String, BannedTokenStoreError> {
         self.get_token(token)
     }
 
