@@ -58,7 +58,7 @@ impl Default for LoginAttemptId {
 // Implement AsRef<str> for LoginAttemptId
 impl AsRef<str> for LoginAttemptId {
     fn as_ref(&self) -> &str {
-        &self.0.as_ref()
+        self.0.as_ref()
     }
 }
 

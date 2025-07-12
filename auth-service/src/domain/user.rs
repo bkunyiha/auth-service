@@ -64,7 +64,7 @@ impl Email {
     }
 
     pub fn to_str(&self) -> &str {
-        &self.email.expose_secret()
+        self.email.expose_secret()
     }
 }
 

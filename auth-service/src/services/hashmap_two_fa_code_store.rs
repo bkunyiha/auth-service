@@ -29,8 +29,8 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
 
     #[tracing::instrument(name = "Removing 2-FA-Code From Local Memery 2FA-Code Cache", skip_all)]
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError> {
-        if self.codes.contains_key(&email) {
-            self.codes.remove(&email);
+        if self.codes.contains_key(email) {
+            self.codes.remove(email);
             Ok(())
         } else {
             Err(TwoFACodeStoreError::LoginAttemptIdNotFound)

@@ -46,7 +46,7 @@ impl BannedTokenStore for RedisBannedTokenStore {
     }
 
     #[tracing::instrument(name = "Getting Token From Keystore Cache", skip_all)]
-    async fn get_token(&self, token: &String) -> Result<String, BannedTokenStoreError> {
+    async fn get_token(&self, token: &str) -> Result<String, BannedTokenStoreError> {
         // 1. Create a new key using the get_key helper function.
         let key = get_key(token);
         // 2. Call the get command on the Redis connection to get the value of the key.

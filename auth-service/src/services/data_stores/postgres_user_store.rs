@@ -125,7 +125,7 @@ async fn verify_password_hash_other(
     password_candidate: String,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let current_span: tracing::Span = tracing::Span::current();
-    let result = tokio::spawn(async move {
+    tokio::spawn(async move {
         current_span.in_scope(|| {
             let expected_password_hash: PasswordHash<'_> =
                 PasswordHash::new(&expected_password_hash)?;
@@ -135,9 +135,7 @@ async fn verify_password_hash_other(
                 .map_err(|e| e.into())
         })
     })
-    .await?;
-
-    result
+    .await?
 }
 
 #[tracing::instrument(name = "Verify password hash", skip_all)]
@@ -176,7 +174,7 @@ async fn compute_password_hash(
     password: Secret<String>,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
     let current_span: tracing::Span = tracing::Span::current();
-    let result = tokio::task::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         current_span.in_scope(|| {
             let salt = SaltString::generate(&mut OsRng);
             let password_hash = Argon2::new(
@@ -190,7 +188,5 @@ async fn compute_password_hash(
             Ok(password_hash)
         })
     })
-    .await?;
-
-    result
+    .await?
 }

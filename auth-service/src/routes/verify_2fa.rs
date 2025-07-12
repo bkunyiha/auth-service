@@ -37,7 +37,7 @@ pub async fn verify_2fa(
         // Validate that the `login_attempt_id` and `two_fa_code`
         // in the request body matches values in the `code_tuple`.
         // If not, return a `AuthAPIError::IncorrectCredentials`.
-        let _ = match two_fa_code_store.get_code(&email).await {
+        match two_fa_code_store.get_code(&email).await {
             Ok((id, code)) if id == login_attempt_id && code == two_fa_code => (),
             Ok((id, _)) if id != login_attempt_id => {
                 return (jar, Err(AuthAPIError::InvalidCredentials))
@@ -49,14 +49,14 @@ pub async fn verify_2fa(
 
     let auth_cookie = match generate_auth_cookie(&email) {
         Ok(cookie) => cookie,
-        Err(e) => return (jar, Err(AuthAPIError::UnexpectedError(e.into()))),
+        Err(e) => return (jar, Err(AuthAPIError::UnexpectedError(e))),
     };
     let updated_jar = jar.add(auth_cookie);
 
     {
         //  Remove 2FA code from the code store after successful authentication.
         let mut two_fa_code_store = state.two_fa_code_store.write().await;
-        let _ = match two_fa_code_store.remove_code(&email).await {
+        match two_fa_code_store.remove_code(&email).await {
             Ok(_) => (),
             Err(e) => return (updated_jar, Err(AuthAPIError::UnexpectedError(e.into()))),
         };
