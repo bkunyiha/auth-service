@@ -1,24 +1,24 @@
 use auth_service::domain::Email;
 use auth_service::{
+    Application,
     app_state::{
         AppState, BannedTokenStoreType, EmailClientType, TwoFACodeStoreType, UserStoreType,
     },
     get_postgres_pool, get_redis_client,
     services::data_stores::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore},
     services::postmark_email_client::PostmarkEmailClient,
-    utils::constants::{test, DATABASE_URL, REDIS_HOST_NAME},
-    Application,
+    utils::constants::{DATABASE_URL, REDIS_HOST_NAME, test},
 };
 use reqwest::Client;
-use secrecy::Secret;
+use secrecy::SecretBox;
 use std::str::FromStr;
 use wiremock::MockServer;
 
 use reqwest::cookie::Jar;
 use serde_json::json;
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions},
     Connection, Executor, PgConnection, PgPool,
+    postgres::{PgConnectOptions, PgPoolOptions},
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -239,9 +239,12 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
 }
 
 fn configure_postmark_email_client(base_url: String) -> PostmarkEmailClient {
-    let postmark_auth_token = Secret::new("auth_token".to_owned());
+    let postmark_auth_token = SecretBox::new(Box::new("auth_token".to_owned()));
 
-    let sender = Email::parse(Secret::new(test::email_client::SENDER.to_owned())).unwrap();
+    let sender = Email::parse(SecretBox::new(Box::new(
+        test::email_client::SENDER.to_owned(),
+    )))
+    .unwrap();
 
     let http_client = Client::builder()
         .timeout(test::email_client::TIMEOUT)

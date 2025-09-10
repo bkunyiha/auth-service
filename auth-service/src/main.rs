@@ -2,6 +2,7 @@ use auth_service::domain::Email;
 use auth_service::utils::constants::{prod, test};
 use auth_service::utils::init_tracing;
 use auth_service::{
+    Application,
     app_state::{
         AppState, BannedTokenStoreType, EmailClientType, TwoFACodeStoreType, UserStoreType,
     },
@@ -9,10 +10,9 @@ use auth_service::{
     services::data_stores::{PostgresUserStore, RedisBannedTokenStore, RedisTwoFACodeStore},
     services::postmark_email_client::PostmarkEmailClient,
     utils::{DATABASE_URL, REDIS_HOST_NAME},
-    Application,
 };
 use reqwest::Client;
-use secrecy::Secret;
+use secrecy::SecretBox;
 use sqlx::PgPool;
 use std::env;
 use std::sync::Arc;
@@ -83,8 +83,11 @@ fn configure_postmark_email_client() -> PostmarkEmailClient {
 
     PostmarkEmailClient::new(
         prod::email_client::BASE_URL.to_owned(),
-        Email::parse(Secret::new(prod::email_client::SENDER.to_owned())).unwrap(),
-        Secret::new(postmark_auth_token),
+        Email::parse(SecretBox::new(Box::new(
+            prod::email_client::SENDER.to_owned(),
+        )))
+        .unwrap(),
+        SecretBox::new(Box::new(postmark_auth_token)),
         http_client,
     )
 }

@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 use reqwest::{Client, Url};
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretBox};
 
 use crate::domain::{Email, EmailClient};
 
@@ -9,14 +9,14 @@ pub struct PostmarkEmailClient {
     http_client: Client,
     base_url: String,
     sender: Email,
-    authorization_token: Secret<String>,
+    authorization_token: SecretBox<String>,
 }
 
 impl PostmarkEmailClient {
     pub fn new(
         base_url: String,
         sender: Email,
-        authorization_token: Secret<String>,
+        authorization_token: SecretBox<String>,
         http_client: Client,
     ) -> Self {
         Self {
@@ -105,7 +105,7 @@ mod tests {
 
     // Helper function to generate a test email
     fn email() -> Email {
-        Email::parse(Secret::new(SafeEmail().fake())).unwrap()
+        Email::parse(SecretBox::new(Box::new(SafeEmail().fake()))).unwrap()
     }
 
     // Helper function to create a test email client
@@ -114,7 +114,12 @@ mod tests {
             .timeout(test::email_client::TIMEOUT)
             .build()
             .unwrap();
-        PostmarkEmailClient::new(base_url, email(), Secret::new(Faker.fake()), http_client)
+        PostmarkEmailClient::new(
+            base_url,
+            email(),
+            SecretBox::new(Box::new(Faker.fake())),
+            http_client,
+        )
     }
 
     // Custom matcher to validate the email request body

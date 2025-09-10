@@ -4,7 +4,7 @@ use std::time::Duration;
 use tracing::{Level, Span};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 
 pub fn init_tracing() -> Result<()> {
     // Create a formatting layer for tracing output with a compact format

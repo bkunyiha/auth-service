@@ -1,7 +1,7 @@
 use crate::app_state::AppState;
 use crate::utils::tracing::{make_span_with_request_id, on_request, on_response};
-use axum::routing::post;
 use axum::Router;
+use axum::routing::post;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
 mod login;

@@ -1,15 +1,15 @@
 use app_state::AppState;
 use axum::{
+    Json, Router,
     http::Method,
     http::StatusCode,
     response::{IntoResponse, Response},
     serve::Serve,
-    Json, Router,
 };
 use domain::AuthAPIError;
 use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::error::Error;
 use tower_http::cors::CorsLayer;
 use utils::constants::APP_SERVICE_HOST;
