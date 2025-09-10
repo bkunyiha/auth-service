@@ -14,11 +14,15 @@ pub async fn verify_token(
     Json(request): Json<VerifyTokenRequest>,
 ) -> impl IntoResponse {
     let req_token = request.token;
-    let banned_token_store = &state.banned_token_store.read().await;
-    match banned_token_store.get_token(&req_token).await {
-        Ok(_) => return Err(AuthAPIError::InvalidToken),
-        Err(_) => Ok(()),
-    }?;
+
+    // Check if token is banned first - use block scope to control lifetime
+    {
+        let banned_token_store = state.banned_token_store.read().await;
+        match banned_token_store.get_token(&req_token).await {
+            Ok(_) => return Err(AuthAPIError::InvalidToken),
+            Err(_) => Ok(()),
+        }?;
+    } // banned_token_store is dropped here, releasing the read lock
 
     // Retrieve JWT cookie from the `CookieJar`
     // Return AuthAPIError::MissingToken is the cookie is not found
@@ -32,7 +36,7 @@ pub async fn verify_token(
     // Validate JWT token by calling `validate_token` from the auth service.
     // If the token is valid you can ignore the returned claims for now.
     // Return AuthAPIError::InvalidToken is validation fails.
-    match validate_token(&token, state.banned_token_store.clone()).await {
+    match validate_token(&token, state.banned_token_store).await {
         Ok(_) => {
             if token == req_token {
                 Ok(StatusCode::OK)

@@ -1,6 +1,6 @@
 use crate::helpers::TestApp;
-use auth_service::{routes::SignupResponse, ErrorResponse};
-use fake::{faker::internet::en::SafeEmail, Fake};
+use auth_service::{ErrorResponse, routes::SignupResponse};
+use fake::{Fake, faker::internet::en::SafeEmail};
 
 // Implement tests for all other routes (signup, login, logout, verify-2fa, and verify-token)
 #[tokio::test]

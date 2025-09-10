@@ -54,8 +54,8 @@ mod tests {
     use super::*;
     use crate::app_state::TwoFACodeStoreType;
     use crate::domain::user::Email;
-    use fake::{faker::internet::en::SafeEmail, Fake};
-    use secrecy::Secret;
+    use fake::{Fake, faker::internet::en::SafeEmail};
+    use secrecy::SecretBox;
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
@@ -65,16 +65,18 @@ mod tests {
         let two_fa_code_store: TwoFACodeStoreType =
             Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
-        let email_secret: Secret<String> = Secret::new(SafeEmail().fake());
+        let email_secret: SecretBox<String> = SecretBox::new(Box::new(SafeEmail().fake()));
         let email = Email::parse(email_secret).unwrap();
         let login_attempt_id = LoginAttemptId::default();
         let code = TwoFACode::default();
 
         // First add should succeed
-        assert!(store
-            .add_code(email.clone(), login_attempt_id.clone(), code.clone())
-            .await
-            .is_ok());
+        assert!(
+            store
+                .add_code(email.clone(), login_attempt_id.clone(), code.clone())
+                .await
+                .is_ok()
+        );
 
         // Second add with same email should fail
         assert_eq!(
@@ -90,7 +92,7 @@ mod tests {
         let two_fa_code_store: TwoFACodeStoreType =
             Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
-        let email = Email::parse(Secret::new(SafeEmail().fake())).unwrap();
+        let email = Email::parse(SecretBox::new(Box::new(SafeEmail().fake()))).unwrap();
         let login_attempt_id = LoginAttemptId::default();
         let code = TwoFACode::default();
 
@@ -121,7 +123,7 @@ mod tests {
         let two_fa_code_store: TwoFACodeStoreType =
             Arc::new(RwLock::new(Box::new(HashmapTwoFACodeStore::default())));
         let mut store = two_fa_code_store.write().await;
-        let email = Email::parse(Secret::new(SafeEmail().fake())).unwrap();
+        let email = Email::parse(SecretBox::new(Box::new(SafeEmail().fake()))).unwrap();
         let login_attempt_id = LoginAttemptId::default();
         let code = TwoFACode::default();
 

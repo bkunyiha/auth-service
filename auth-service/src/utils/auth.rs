@@ -1,7 +1,7 @@
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use chrono::Utc;
-use color_eyre::eyre::{eyre, Context, ContextCompat, Result};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
+use color_eyre::eyre::{Context, ContextCompat, Result, eyre};
+use jsonwebtoken::{DecodingKey, EncodingKey, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::BannedTokenStoreType;
@@ -101,13 +101,13 @@ mod tests {
     use super::*;
     use crate::services::HashsetBannedTokenStore;
     use chrono::Utc;
-    use secrecy::Secret;
+    use secrecy::SecretBox;
     use std::sync::Arc;
     use tokio::sync::RwLock;
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
-        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
+        let email = Email::parse(SecretBox::new(Box::new("test@example.com".to_string()))).unwrap();
         let cookie = generate_auth_cookie(&email).unwrap();
         assert_eq!(cookie.name(), JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
@@ -129,14 +129,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_token() {
-        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
+        let email = Email::parse(SecretBox::new(Box::new("test@example.com".to_string()))).unwrap();
         let result = generate_auth_token(&email).unwrap();
         assert_eq!(result.split('.').count(), 3);
     }
 
     #[tokio::test]
     async fn test_validate_token_with_valid_token() {
-        let email = Email::parse(Secret::new("test@example.com".to_string())).unwrap();
+        let email = Email::parse(SecretBox::new(Box::new("test@example.com".to_string()))).unwrap();
         let token = generate_auth_token(&email).unwrap();
         let banned_token_store: BannedTokenStoreType =
             Arc::new(RwLock::new(Box::new(HashsetBannedTokenStore::default())));

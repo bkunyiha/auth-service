@@ -1,5 +1,5 @@
 use axum::http::StatusCode;
-use secrecy::Secret;
+use secrecy::SecretBox;
 use serde::Deserialize;
 
 use axum::{debug_handler, extract::Json, extract::State};
@@ -40,7 +40,7 @@ pub async fn verify_2fa(
         match two_fa_code_store.get_code(&email).await {
             Ok((id, code)) if id == login_attempt_id && code == two_fa_code => (),
             Ok((id, _)) if id != login_attempt_id => {
-                return (jar, Err(AuthAPIError::InvalidCredentials))
+                return (jar, Err(AuthAPIError::InvalidCredentials));
             }
             Ok(_) => return (jar, Err(AuthAPIError::IncorrectCredentials)),
             Err(_) => return (jar, Err(AuthAPIError::InvalidToken)),
@@ -68,7 +68,7 @@ pub async fn verify_2fa(
 
 #[derive(Deserialize, Debug)]
 pub struct Verify2FARequest {
-    pub email: Secret<String>,
+    pub email: SecretBox<String>,
     #[serde(rename = "loginAttemptId")]
     pub login_attempt_id: String,
     #[serde(rename = "2FACode")]
@@ -78,7 +78,7 @@ pub struct Verify2FARequest {
 impl Verify2FARequest {
     pub fn new(email: String, login_attempt_id: String, two_fa_code: String) -> Self {
         Self {
-            email: Secret::new(email),
+            email: SecretBox::new(Box::new(email)),
             login_attempt_id,
             two_fa_code,
         }

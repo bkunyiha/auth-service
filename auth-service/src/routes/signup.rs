@@ -3,7 +3,7 @@ use crate::domain::{AuthAPIError, Email, Password, User};
 use axum::{
     debug_handler, extract::Json, extract::State, http::StatusCode, response::IntoResponse,
 };
-use secrecy::Secret;
+use secrecy::SecretBox;
 use serde::{Deserialize, Serialize};
 
 #[debug_handler]
@@ -37,8 +37,8 @@ pub async fn signup(
 
 #[derive(Deserialize, Debug)]
 pub struct SignupRequest {
-    pub email: Secret<String>,
-    pub password: Secret<String>,
+    pub email: SecretBox<String>,
+    pub password: SecretBox<String>,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
 }
@@ -46,8 +46,8 @@ pub struct SignupRequest {
 impl SignupRequest {
     pub fn new(email: String, password: String, requires_2fa: bool) -> Self {
         Self {
-            email: Secret::new(email),
-            password: Secret::new(password),
+            email: SecretBox::new(Box::new(email)),
+            password: SecretBox::new(Box::new(password)),
             requires_2fa,
         }
     }

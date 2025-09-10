@@ -1,4 +1,4 @@
-use color_eyre::eyre::{eyre, Context, Result};
+use color_eyre::eyre::{Context, Result, eyre};
 use redis::{Commands, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

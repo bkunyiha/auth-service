@@ -1,6 +1,6 @@
 use super::helpers::TestApp;
 use auth_service::utils::constants::JWT_COOKIE_NAME;
-use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
+use fake::{Fake, faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail};
 use serde_json::json;
 
 #[tokio::test]

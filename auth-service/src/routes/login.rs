@@ -1,12 +1,12 @@
 use axum::{debug_handler, extract::Json, extract::State, http::StatusCode};
 use axum_extra::extract::CookieJar;
-use color_eyre::eyre::{eyre, Result};
-use secrecy::Secret;
+use color_eyre::eyre::{Result, eyre};
+use secrecy::SecretBox;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{email_client::EmailClient, AuthAPIError, Email, Password},
+    domain::{AuthAPIError, Email, Password, email_client::EmailClient},
     services::{LoginAttemptId, TwoFACode},
     utils::auth::generate_auth_cookie,
 };
@@ -124,15 +124,15 @@ async fn handle_no_2fa(
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
-    email: Secret<String>,
-    password: Secret<String>,
+    email: SecretBox<String>,
+    password: SecretBox<String>,
 }
 
 impl LoginRequest {
     pub fn new(email: String, password: String) -> Self {
         Self {
-            email: Secret::new(email),
-            password: Secret::new(password),
+            email: SecretBox::new(Box::new(email)),
+            password: SecretBox::new(Box::new(password)),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::helpers::TestApp;
 use auth_service::utils::constants::JWT_COOKIE_NAME;
-use fake::{faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail, Fake};
+use fake::{Fake, faker::internet::en::Password as FakerPassword, faker::internet::en::SafeEmail};
 use reqwest::Url;
 
 #[tokio::test]
@@ -160,8 +160,10 @@ async fn verify_token_added_to_banned_token_store_after_logout() {
 
     // Verify the token added to banned token store after logout
     let banned_token_store = app.banned_token_store.read().await;
-    assert!(banned_token_store
-        .get_token(&login_token.to_string())
-        .await
-        .is_ok());
+    assert!(
+        banned_token_store
+            .get_token(&login_token.to_string())
+            .await
+            .is_ok()
+    );
 }

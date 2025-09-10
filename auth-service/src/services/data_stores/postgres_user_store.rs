@@ -1,8 +1,8 @@
 use std::error::Error;
 
 use argon2::{
-    password_hash::SaltString, Algorithm, Argon2, Params, PasswordHash, PasswordHasher,
-    PasswordVerifier, Version,
+    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
+    password_hash::SaltString,
 };
 
 use sqlx::PgPool;
@@ -10,8 +10,8 @@ use sqlx::PgPool;
 use crate::domain::{Email, Password, User};
 use crate::services::data_stores::{UserStore, UserStoreError};
 use argon2::password_hash::rand_core::OsRng;
-use color_eyre::eyre::{eyre, Context, Result};
-use secrecy::{ExposeSecret, Secret};
+use color_eyre::eyre::{Context, Result, eyre};
+use secrecy::{ExposeSecret, SecretBox};
 
 pub struct DBUser {
     pub email: String,
@@ -40,9 +40,9 @@ impl UserStore for PostgresUserStore {
         };
 
         // Hash the password before storing
-        let password_hash = compute_password_hash(Secret::new(
+        let password_hash = compute_password_hash(SecretBox::new(Box::new(
             user.password.as_ref().expose_secret().to_owned(),
-        ))
+        )))
         .await
         .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?;
 
@@ -76,7 +76,7 @@ impl UserStore for PostgresUserStore {
             Some(db_user) => {
                 let user = User::new(
                     email.clone(),
-                    Password::parse(Secret::new(db_user.password_hash))
+                    Password::parse(SecretBox::new(Box::new(db_user.password_hash)))
                         .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
                     db_user.requires_2fa,
                 );
@@ -119,24 +119,24 @@ impl UserStore for PostgresUserStore {
 // Hashing is a CPU-intensive operation. To avoid blocking
 // other async tasks, this function to performs hashing on a
 // separate thread pool using tokio::task::spawn_blocking.
-#[tracing::instrument(name = "Verify password hash", skip_all)]
-async fn verify_password_hash_other(
-    expected_password_hash: String,
-    password_candidate: String,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let current_span: tracing::Span = tracing::Span::current();
-    tokio::spawn(async move {
-        current_span.in_scope(|| {
-            let expected_password_hash: PasswordHash<'_> =
-                PasswordHash::new(&expected_password_hash)?;
+// #[tracing::instrument(name = "Verify password hash", skip_all)]
+// async fn verify_password_hash_other(
+//     expected_password_hash: String,
+//     password_candidate: String,
+// ) -> Result<(), Box<dyn Error + Send + Sync>> {
+//     let current_span: tracing::Span = tracing::Span::current();
+//     tokio::spawn(async move {
+//         current_span.in_scope(|| {
+//             let expected_password_hash: PasswordHash<'_> =
+//                 PasswordHash::new(&expected_password_hash)?;
 
-            Argon2::default()
-                .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-                .map_err(|e| e.into())
-        })
-    })
-    .await?
-}
+//             Argon2::default()
+//                 .verify_password(password_candidate.as_bytes(), &expected_password_hash)
+//                 .map_err(|e| e.into())
+//         })
+//     })
+//     .await?
+// }
 
 #[tracing::instrument(name = "Verify password hash", skip_all)]
 async fn verify_password_hash(
@@ -171,7 +171,7 @@ async fn verify_password_hash(
 // will need to update the input parameters to be String types instead of &str
 #[tracing::instrument(name = "Computing password hash", skip_all)]
 async fn compute_password_hash(
-    password: Secret<String>,
+    password: SecretBox<String>,
 ) -> Result<String, Box<dyn Error + Send + Sync>> {
     let current_span: tracing::Span = tracing::Span::current();
     tokio::task::spawn_blocking(move || {
