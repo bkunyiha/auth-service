@@ -75,7 +75,7 @@ async fn protected(jar: CookieJar) -> impl IntoResponse {
             StatusCode::UNAUTHORIZED.into_response()
         }
         reqwest::StatusCode::OK => Json(ProtectedRouteResponse {
-            img_url: "https://i.ibb.co/YP90j68/Light-Live-Bootcamp-Certificate.png".to_owned(),
+            img_url: "https://images.squarespace-cdn.com/content/v1/5ae3ce6b75f9ee2c32f6c6b5/1561730753634-BOKACWAH5YZDBW3A7C3T/all+good.jpg".to_owned(),
         })
         .into_response(),
         _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
