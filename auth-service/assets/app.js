@@ -67,8 +67,12 @@ loginButton.addEventListener("click", (e) => {
             loginForm.password.value = "";
             loginErrAlter.style.display = "none";
             alert("You have successfully logged in.");
-            // Redirect back to app-service - Updated for deployment
-            window.location.href = "https://app-service.billkunyiha.com";
+            // Redirect back to app-service - Force redirect v2
+            console.log("Redirecting to app-service...");
+            console.log("Current URL:", window.location.href);
+            setTimeout(() => {
+                window.location.href = "https://app-service.billkunyiha.com";
+            }, 1000);
         } else {
             response.json().then(data => {
                 let error_msg = data.error;
@@ -148,8 +152,12 @@ TwoFAButton.addEventListener("click", (e) => {
             TwoFAForm.login_attempt_id.value = "";
             TwoFAErrAlter.style.display = "none";
             alert("You have successfully logged in.");
-            // Redirect back to app-service - Updated for deployment
-            window.location.href = "https://app-service.billkunyiha.com";
+            // Redirect back to app-service - Force redirect v2
+            console.log("Redirecting to app-service...");
+            console.log("Current URL:", window.location.href);
+            setTimeout(() => {
+                window.location.href = "https://app-service.billkunyiha.com";
+            }, 1000);
         } else {
             response.json().then(data => {
                 let error_msg = data.error;
