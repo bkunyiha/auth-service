@@ -7,7 +7,7 @@ on:
       - main
   workflow_dispatch:  # Allow manual triggering
 
-# Force SQLx offline mode to prevent compile-time database connection errors
+# During Buikd face, force SQLx offline mode to prevent compile-time database connection errors
 env:
   SQLX_OFFLINE: true
 
