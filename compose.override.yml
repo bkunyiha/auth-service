@@ -1,11 +1,13 @@
 services:
   app-service:
     build:
-      context: ./app-service # specify directory where local Dockerfile is located
+      context: .
+      dockerfile: ./app-service/Dockerfile
       tags:
         - bkunyiha/app-service:latest
   auth-service:
     build:
-      context: ./auth-service # specify directory where local Dockerfile is located
+      context: .
+      dockerfile: ./auth-service/Dockerfile
       tags:
         - bkunyiha/auth-service:latest

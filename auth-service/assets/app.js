@@ -1,3 +1,4 @@
+// DEPLOYMENT TEST - v3
 const loginSection = document.getElementById("login-section");
 const twoFASection = document.getElementById("2fa-section");
 const signupSection = document.getElementById("signup-section");
@@ -66,7 +67,7 @@ loginButton.addEventListener("click", (e) => {
             loginForm.email.value = "";
             loginForm.password.value = "";
             loginErrAlter.style.display = "none";
-            alert("You have successfully logged in.");
+            alert("You have successfully logged in! Redirecting in 1 second...");
             // Redirect back to app-service - Force redirect v2
             console.log("Redirecting to app-service...");
             console.log("Current URL:", window.location.href);
@@ -151,7 +152,7 @@ TwoFAButton.addEventListener("click", (e) => {
             TwoFAForm.email_code.value = "";
             TwoFAForm.login_attempt_id.value = "";
             TwoFAErrAlter.style.display = "none";
-            alert("You have successfully logged in.");
+            alert("You have successfully logged in! Redirecting in 1 second...");
             // Redirect back to app-service - Force redirect v2
             console.log("Redirecting to app-service...");
             console.log("Current URL:", window.location.href);
