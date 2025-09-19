@@ -5,42 +5,38 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch:  # Allow manual triggering
 
-# We want to make sure SQLx doesn't throw compile time errors so we force offline mode.
+# Force SQLx offline mode to prevent compile-time database connection errors
 env:
   SQLX_OFFLINE: true
 
 jobs:
+  # Build and test job - runs tests and builds Docker images
   build:
     runs-on: ubuntu-latest
 
-    # Our tests require a running PostgreSQL and Redis instance!
-    # Service containers to run with the `test` container job
+    # Service containers for testing - PostgreSQL and Redis must be running for tests
     services:
       postgres:
-        # Docker Hub image
         image: postgres:15.2-alpine
-        # Environment variables scoped only for the `postgres` element
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: postgres
-        # Opens tcp port 5432 on the host and service container
         ports:
-          - 5432:5432
+          - 5432:5432  # Expose PostgreSQL port for tests
       redis:
-        # Docker Hub image
         image: redis:7.0-alpine
         ports:
-          - 6379:6379
+          - 6379:6379  # Expose Redis port for tests
 
     steps:
       # Checkout code from the repository
     - name: Checkout code
       uses: actions/checkout@v2
 
-      # Cache dependencies to speed up build times
+      # Cache Rust dependencies to speed up build times
     - name: Cache dependencies
       uses: actions/cache@v3
       with:
@@ -52,16 +48,18 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-
 
+    # Install Rust toolchain
     - name: Install Rust
       run: rustup update stable && rustup default stable
 
+    # Build and test app-service (main application)
     - name: Build and test app-service code
       working-directory: ./app-service
       run: |
         cargo build --verbose
         cargo test --verbose
 
-      # For the Build and test auth-service code job we will set JWT_SECRET to the dummy value "secret":
+    # Build and test auth-service (authentication service)
     - name: Build and test auth-service code
       working-directory: ./auth-service
       run: |
@@ -71,19 +69,18 @@ jobs:
         cargo build --verbose
         cargo test --verbose
 
-      # Set up Docker Buildx for multi-platform builds
+    # Set up Docker Buildx for multi-platform builds
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 
+    # Authenticate with Docker Hub for image pushing
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Clean up Docker
-    # This ensures the runner has enough free disk space before you build and push new Docker images, 
-    # helping prevent failures due to "no space left on device."    
+    # Clean up Docker to free disk space before building images
     - name: Clean up Docker
       run: |
         docker container prune -f
@@ -91,6 +88,7 @@ jobs:
         docker volume prune -f
         docker system prune -af
 
+    # Build and push Docker images using Docker Bake (reads compose.yml)
     - name: Build and push Docker images
       uses: docker/bake-action@v2.3.0
       with:
@@ -99,29 +97,34 @@ jobs:
           compose.yml
           compose.override.yml
         set: |
-          *.cache-from=type=gha
+          *.cache-from=type=gha  # Use GitHub Actions cache for Docker layers
           *.cache-to=type=gha,mode=max
 
+  # Deployment job - deploys to production server after successful build
   deploy:
-    needs: build
+    needs: build  # Wait for build job to complete
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    # Authenticate with Docker Hub (needed for pulling images on server)
     - name: Log in to Docker Hub
       uses: docker/login-action@v1
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
+    # Install sshpass for password-based SSH authentication
     - name: Install sshpass
       run: sudo apt-get install sshpass
 
+    # Copy compose.yml to production server
     - name: Copy compose.yml to droplet
       run: sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
 
+    # Deploy to production server via SSH
     - name: Deploy
       uses: appleboy/ssh-action@master
       with:
@@ -130,6 +133,7 @@ jobs:
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
           cd ~
+          # Set environment variables for production
           export JWT_SECRET=${{ secrets.JWT_SECRET }}
           export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}          
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
@@ -138,6 +142,7 @@ jobs:
           export EMAIL_SERVICE_HOST=${{ vars.EMAIL_SERVICE_HOST }}
           export EMAIL_FROM_USER=${{ vars.EMAIL_FROM_USER }}
           export EMAIL_TIMEOUT_MILLIS=${{ vars.EMAIL_TIMEOUT_MILLIS }}
-          docker compose down
-          docker compose pull
-          docker compose up -d
+          # Deploy the application
+          docker compose down      # Stop existing containers
+          docker compose pull      # Pull latest images from Docker Hub
+          docker compose up -d     # Start containers in detached mode

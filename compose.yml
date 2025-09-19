@@ -1,71 +1,78 @@
 services:
+  # Main application service - serves protected content and validates tokens
   app-service:
-    image: bkunyiha/app-service # specify name of image on Docker Hub
-    restart: "always" # automatically restart container when server crashes
+    build: ./app-service                   # Build locally (includes latest code changes)
+    image: bkunyiha/app-service            # Tag for Docker Hub push
+    restart: "always"                      # Auto-restart on crash
     hostname: app-service
-    environment: # set up environment variables
-      AUTH_SERVICE_IP: ${AUTH_SERVICE_IP:-localhost} # Use localhost as the default value
+    environment:
+      AUTH_SERVICE_IP: ${AUTH_SERVICE_IP:-localhost} # Auth service hostname for token validation
     ports:
-      - "8000:8000" # expose port 8000 so that applications outside the container can connect to it 
-    depends_on: # only run app-service after auth-service has started
+      - "8000:8000"                        # Expose to host (routed via Nginx)
+    depends_on:                            # Wait for auth-service to be ready
       auth-service:
         condition: service_started
     networks:
       - app-network
 
+  # Authentication service - handles login, 2FA, token generation/validation
   auth-service:
-    image: bkunyiha/auth-service
-    restart: "always" # automatically restart container when server crashes
+    build: ./auth-service                  # Build locally (includes latest JS assets)
+    image: bkunyiha/auth-service           # Tag for Docker Hub push
+    restart: "always"                      # Auto-restart on crash
     hostname: auth-service
     ports:
-      - "3000:3000" # expose port 3000 so that applications outside the container can connect to it
+      - "3000:3000"                        # Expose to host (routed via Nginx)
     environment:
-      JWT_SECRET: ${JWT_SECRET} 
-      APP_SERVICE_HOST: ${APP_SERVICE_HOST}
-      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD}@db:5432"
-      POSTMARK_AUTH_TOKEN: ${POSTMARK_AUTH_TOKEN}
-      EMAIL_SERVICE_HOST: ${EMAIL_SERVICE_HOST}
-      EMAIL_FROM_USER: ${EMAIL_FROM_USER}
-      EMAIL_TIMEOUT_MILLIS: ${EMAIL_TIMEOUT_MILLIS}
+      JWT_SECRET: ${JWT_SECRET}            # Secret for signing JWT tokens
+      APP_SERVICE_HOST: ${APP_SERVICE_HOST} # CORS configuration
+      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD}@db:5432" # User data storage
+      POSTMARK_AUTH_TOKEN: ${POSTMARK_AUTH_TOKEN} # Email service API key
+      EMAIL_SERVICE_HOST: ${EMAIL_SERVICE_HOST}   # Email service hostname
+      EMAIL_FROM_USER: ${EMAIL_FROM_USER}         # Sender email address
+      EMAIL_TIMEOUT_MILLIS: ${EMAIL_TIMEOUT_MILLIS} # Email timeout
     depends_on:
-      - db  
+      - db                                 # Wait for database to be ready
     networks:
       - app-network
 
+  # PostgreSQL database - stores user accounts and authentication data
   db:
     image: postgres:15.2-alpine
     restart: always
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Database password from env vars
     ports:
-      - "5432:5432"
+      - "5432:5432"                          # Expose for external connections
     volumes:
-      - db:/var/lib/postgresql/data
+      - db:/var/lib/postgresql/data          # Persist database data
     networks:
       - app-network
 
+  # Redis cache - stores 2FA codes and banned tokens
   redis:
     image: redis:7.0-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "6379:6379"                          # Expose for external connections
     networks:
       - app-network  
 
+  # Nginx reverse proxy - handles SSL termination and routes traffic
   web-server:
     image: nginx:mainline-alpine
-    restart: "always" # automatically restart container when server crashes
+    restart: "always"                        # Auto-restart on crash
     hostname: web-server
     ports:
-      - "80:80"
-      - 443:443
+      - "80:80"                              # HTTP (for ACME challenges)
+      - "443:443"                            # HTTPS (main traffic)
     volumes:
-      - web-root:/var/www/html # mount web-root volume to /var/www/html on the container
-      - ./nginx-conf:/etc/nginx/conf.d # mount nginx-conf volume to /etc/nginx/conf.d
-      - ./certbot-etc:/etc/letsencrypt # mount certbot-etc volume(Let’s Encrypt certificates and keys) to /etc/letsencrypt
-      - ./certbot-var:/var/lib/letsencrypt # mount certbot-var volume(Let’s Encrypt’s default working directory) to /var/lib/letsencrypt
-      - dhparam:/etc/ssl/certs
-    depends_on:
+      - web-root:/var/www/html               # Static files (ACME challenges)
+      - ./nginx-conf:/etc/nginx/conf.d       # Nginx configuration
+      - ./certbot-etc:/etc/letsencrypt       # SSL certificates
+      - ./certbot-var:/var/lib/letsencrypt   # Let's Encrypt working files
+      - dhparam:/etc/ssl/certs               # DH parameters for SSL
+    depends_on:                              # Wait for both services to be ready
       auth-service:
         condition: service_started
       app-service:
@@ -73,43 +80,50 @@ services:
     networks:
       - app-network
 
-  # Manages SSL certificates
-  # Uses Let's Encrypt for free SSL certificates
-  # Depends on web-server being ready
+  # SSL certificate manager - obtains/renews Let's Encrypt certificates
   certbot:
     image: certbot/certbot
     volumes:
-      - web-root:/var/www/html # mount web-root volume to /var/www/html on the container
-      - ./certbot-etc:/etc/letsencrypt # mount certbot-etc volume(Let’s Encrypt certificates and keys) to /etc/letsencrypt  
-      - ./certbot-var:/var/lib/letsencrypt # mount certbot-var volume(Let’s Encrypt’s default working directory) to /var/lib/letsencrypt
+      - web-root:/var/www/html               # ACME challenge files
+      - ./certbot-etc:/etc/letsencrypt       # Certificate storage
+      - ./certbot-var:/var/lib/letsencrypt   # Let's Encrypt working directory
     depends_on:
-      web-server: # only run certbot after web-server has started
+      web-server:                            # Wait for Nginx to be ready
         condition: service_started
     command: certonly --verbose --webroot --webroot-path=/var/www/html --email bkunyiha@billkunyiha.com --agree-tos --no-eff-email --force-renewal -d app-service.billkunyiha.com -d auth-service.billkunyiha.com;
     networks:
       - app-network
 
 volumes:
+  # SSL certificate storage - shared between Nginx and Certbot
   certbot-etc:       # Stores SSL certificates. Mounted at /etc/letsencrypt in containers
   certbot-var:       # Stores Let's Encrypt working files. Mounted at /var/lib/letsencrypt in containers
+  
+  # Web root - ACME challenge files for SSL certificate validation
   web-root:          # Stores website files
     driver: local    # Uses local filesystem storage
     driver_opts:     # Specific options for the volume
       type: none     # Direct mount (no special filesystem)
       device: ./mount_dir/auth-service/html/  # Source path on host
       o: bind        # Bind mount type
+  
+  # SSL DH parameters - for enhanced SSL security
   dhparam:
     driver: local
     driver_opts:
       type: none
       device: ./mount_dir/dhparam/
       o: bind
+  
+  # Database storage - persistent PostgreSQL data
   db:
     driver: local
     driver_opts:
       type: none
       device: ./mount_dir/postgres/
       o: bind
+
+# Internal network for service communication
 networks:
   app-network:
-      driver: bridge
+      driver: bridge  # Default Docker bridge network
