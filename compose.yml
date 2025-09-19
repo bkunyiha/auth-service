@@ -1,7 +1,6 @@
 services:
   # Main application service - serves protected content and validates tokens
   app-service:
-    build: ./app-service                   # Build locally (includes latest code changes)
     image: bkunyiha/app-service            # Tag for Docker Hub push
     restart: "always"                      # Auto-restart on crash
     hostname: app-service
@@ -17,7 +16,6 @@ services:
 
   # Authentication service - handles login, 2FA, token generation/validation
   auth-service:
-    build: ./auth-service                  # Build locally (includes latest JS assets)
     image: bkunyiha/auth-service           # Tag for Docker Hub push
     restart: "always"                      # Auto-restart on crash
     hostname: auth-service
