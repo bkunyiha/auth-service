@@ -67,7 +67,7 @@ loginButton.addEventListener("click", (e) => {
             loginForm.password.value = "";
             loginErrAlter.style.display = "none";
             alert("You have successfully logged in.");
-            // Redirect back to app-service
+            // Redirect back to app-service - Updated for deployment
             window.location.href = "https://app-service.billkunyiha.com";
         } else {
             response.json().then(data => {
@@ -148,7 +148,7 @@ TwoFAButton.addEventListener("click", (e) => {
             TwoFAForm.login_attempt_id.value = "";
             TwoFAErrAlter.style.display = "none";
             alert("You have successfully logged in.");
-            // Redirect back to app-service
+            // Redirect back to app-service - Updated for deployment
             window.location.href = "https://app-service.billkunyiha.com";
         } else {
             response.json().then(data => {
