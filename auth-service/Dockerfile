@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Stage 2: Planner - Analyze dependencies without building
 FROM chef AS planner
-COPY . .
+COPY ./auth-service .
 # Generate dependency recipe
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -18,7 +18,7 @@ COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies (cached layer)
 RUN cargo chef cook --release --recipe-path recipe.json
 # Copy source code
-COPY . .
+COPY ./auth-service .
 # Enable offline SQLx builds
 ENV SQLX_OFFLINE true
 # Build the Rust binary
