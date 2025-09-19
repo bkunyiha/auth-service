@@ -97,9 +97,9 @@ jobs:
           compose.yml
           compose.override.yml
         set: |
-          *.cache-from=type=gha  # Use GitHub Actions cache for Docker layers
+          *.cache-from=type=gha
           *.cache-to=type=gha,mode=max
-          *.platform=linux/amd64,linux/arm64  # Build for multiple architectures
+          *.platform=linux/amd64,linux/arm64
 
   # Deployment job - deploys to production server after successful build
   deploy:
