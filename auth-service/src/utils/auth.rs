@@ -90,7 +90,7 @@ fn create_token(claims: &Claims) -> Result<String> {
     .wrap_err("failed to create token")
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
     pub exp: usize,
