@@ -154,7 +154,10 @@ jobs:
           # system prune including volumes; some older dockers may not accept --volumes -> fallback to without
           docker system prune -af --volumes || docker system prune -af || true
 
-          # Detect likely runtime state problems and restart Docker daemon if needed
+          if [ -e /var/run/docker/runtime-runc ]; then
+            rm -f /var/run/docker/runtime-runc
+          fi
+
           if [ -e /var/run/docker/runtime-runc ] || [ -e /var/run/docker/containerd ]; then
             echo "Detected stale docker runtime state — attempting to restart docker daemon"
             sudo systemctl restart docker || sudo service docker restart || true
