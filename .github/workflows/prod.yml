@@ -36,6 +36,29 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+      # Check disk usage before cleanup for debugging
+    - name: Check disk usage (before cleanup)
+      run: |
+        echo "Before cleanup:"
+        df -h /
+        df -h /var/lib/docker || true
+        du -sh "$GITHUB_WORKSPACE" || true
+
+      # Clean up Docker to free disk space before starting services
+    - name: Clean up Docker to free disk space
+      run: |
+        # Remove stopped containers, unused images, networks, build cache and volumes
+        docker system prune --all --volumes --force || true
+        # Remove any leftover docker-compose temp files
+        rm -rf /tmp/docker-compose* || true
+
+      # Check disk usage after cleanup for debugging
+    - name: Check disk usage (after cleanup)
+      run: |
+        echo "After cleanup:"
+        df -h /
+        df -h /var/lib/docker || true
+
       # Cache Rust dependencies to speed up build times
     - name: Cache dependencies
       uses: actions/cache@v4
