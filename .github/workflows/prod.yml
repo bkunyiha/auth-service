@@ -36,6 +36,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+      # Free up disk space early to prevent container startup failures
+    - name: Free up disk space
+      run: |
+        # Prune Docker artifacts
+        docker container prune -f || true
+        docker image prune -af || true
+        docker volume prune -f || true
+        docker system prune -af || true
+
+        # Remove some large preinstalled SDKs to reclaim space (safe on ephemeral runners)
+        sudo rm -rf /usr/share/dotnet || true
+        sudo rm -rf /opt/ghc || true
+        sudo rm -rf /usr/local/share/boost || true
+        sudo apt-get clean || true
+
+        # Report disk usage for debugging
+        df -h || true
+
       # Cache Rust dependencies to speed up build times
     - name: Cache dependencies
       uses: actions/cache@v4
