@@ -136,15 +136,34 @@ jobs:
           cd ~
           # Set environment variables for production
           export JWT_SECRET=${{ secrets.JWT_SECRET }}
-          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}          
+          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
           export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
           export EMAIL_SERVICE_HOST=${{ vars.EMAIL_SERVICE_HOST }}
           export EMAIL_FROM_USER=${{ vars.EMAIL_FROM_USER }}
           export EMAIL_TIMEOUT_MILLIS=${{ vars.EMAIL_TIMEOUT_MILLIS }}
-          # Deploy the application
-          docker compose down      # Stop existing containers
-          docker image prune -f    # Remove old images to force fresh pull
-          docker compose pull      # Pull latest images from Docker Hub
-          docker compose up -d     # Start containers in detached mode
+
+          # Stop existing containers (best-effort)
+          docker compose down || true
+
+          # Aggressive cleanup to free space and remove stale artifacts
+          docker image prune -af || true
+          docker container prune -f || true
+          docker volume prune -f || true
+          # system prune including volumes; some older dockers may not accept --volumes -> fallback to without
+          docker system prune -af --volumes || docker system prune -af || true
+
+          # Detect likely runtime state problems and restart Docker daemon if needed
+          if [ -e /var/run/docker/runtime-runc ] || [ -e /var/run/docker/containerd ]; then
+            echo "Detected stale docker runtime state — attempting to restart docker daemon"
+            sudo systemctl restart docker || sudo service docker restart || true
+            sleep 3
+          fi
+
+          # Report disk usage for debugging
+          df -h || true
+
+          # Pull latest images and start fresh containers
+          docker compose pull
+          docker compose up -d
