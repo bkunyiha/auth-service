@@ -16,157 +16,143 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Service containers for testing - PostgreSQL and Redis must be running for tests
-    services:
-      postgres:
-        image: postgres:15.2-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432  # Expose PostgreSQL port for tests
-      redis:
-        image: redis:7.0-alpine
-        ports:
-          - 6379:6379  # Expose Redis port for tests
+    # Expose Docker credential secrets as job env so they can be used in "if: env.*" expressions
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     steps:
-      # Checkout code from the repository
     - name: Checkout code
       uses: actions/checkout@v4
 
-      # Cache Rust dependencies to speed up build times
-    - name: Cache dependencies
+    - name: Early disk diagnostic
+      run: |
+        echo "Disk usage at job start"
+        df -h /
+        df -h /run || true
+        df -i / || true
+        echo "Top dirs in /run"
+        sudo du -sh /run/* 2>/dev/null | sort -h | tail -n 20 || true
+
+    - name: Aggressive but safe cleanup to free disk
+      run: |
+        # Remove stopped containers, dangling images, build cache and unused volumes
+        docker container prune -f || true
+        docker image prune -af || true
+        docker volume prune -f || true
+        docker builder prune -af || true
+        # Free GitHub runner toolcache and tmp which can consume space
+        sudo rm -rf /opt/hostedtoolcache/* || true
+        sudo rm -rf /tmp/* || true
+
+    - name: Disk diagnostic after cleanup
+      run: |
+        echo "Disk usage after cleanup"
+        df -h /
+        df -h /run || true
+        docker system df || true
+
+    - name: Start Postgres and Redis (after cleanup)
+      run: |
+        set -euo pipefail
+
+        # Remove any previously-created containers with the same names (ignore errors)
+        docker rm -f ci-postgres >/dev/null 2>&1 || true
+        docker rm -f ci-redis >/dev/null 2>&1 || true
+
+        # Start Postgres and Redis
+        docker run --name ci-postgres -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+          -e POSTGRES_DB=postgres -p 5432:5432 -d postgres:15.2-alpine
+        docker run --name ci-redis -p 6379:6379 -d redis:7.0-alpine
+
+        # Wait for Postgres readiness (timeout after 30s)
+        for i in $(seq 1 30); do
+          if docker exec ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+            echo "Postgres is ready"
+            break
+          fi
+          echo "Waiting for postgres... ($i/30)"
+          sleep 1
+        done
+
+        # Fail fast if Postgres did not become ready
+        if ! docker exec ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
+          echo "Postgres did not become ready in time" >&2
+          docker logs ci-postgres || true
+          exit 1
+        fi
+
+        # Wait for Redis readiness (timeout after 30s)
+        for i in $(seq 1 30); do
+          if docker exec ci-redis redis-cli ping | grep -q PONG; then
+            echo "Redis is ready"
+            break
+          fi
+          echo "Waiting for redis... ($i/30)"
+          sleep 1
+        done
+
+        # Fail fast if Redis did not become ready
+        if ! docker exec ci-redis redis-cli ping | grep -q PONG; then
+          echo "Redis did not become ready in time" >&2
+          docker logs ci-redis || true
+          exit 1
+        fi
+
+        echo "Postgres and Redis are ready"
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Cache cargo registry and build artifacts
       uses: actions/cache@v4
       with:
         path: |
-          app-service/.cargo
-          app-service/target/
-          auth-service/.cargo
-          auth-service/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: cargo-cache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          cargo-cache-${{ runner.os }}-
 
-    # Install Rust toolchain
-    - name: Install Rust
-      run: rustup update stable && rustup default stable
-
-    # Build and test app-service (main application)
-    - name: Build and test app-service code
-      working-directory: ./app-service
+    - name: Run tests
       run: |
-        cargo build --verbose
-        cargo test --verbose
+        # Ensure SQLX_OFFLINE remains set; tests should use the local test DB started above
+        cargo test --workspace --verbose
 
-    # Build and test auth-service (authentication service)
-    - name: Build and test auth-service code
-      working-directory: ./auth-service
+    - name: Build release binary
       run: |
-        export JWT_SECRET=secret
-        export APP_SERVICE_HOST=0.0.0.0:8000
-        export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
-        cargo build --verbose
-        cargo test --verbose
+        cargo build --release --workspace
 
-    # Set up Docker Buildx for multi-platform builds
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    # Authenticate with Docker Hub for image pushing
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
+    - name: Build Docker image
+      uses: docker/build-push-action@v4
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        push: false
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/auth-service:latest
+        context: .
+        file: ./Dockerfile
 
-    # Clean up Docker to free disk space before building images
-    - name: Clean up Docker
-      run: |
-        docker container prune -f
-        docker image prune -af
-        docker volume prune -f
-        docker system prune -af
+    - name: Log in to Docker Hub (optional)
+      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+      uses: docker/login-action@v2
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_PASSWORD }}
 
-    # Build and push Docker images using Docker Bake (reads compose.yml)
-    - name: Build and push Docker images
-      uses: docker/bake-action@v2.3.0
+    - name: Push Docker image to Docker Hub (optional)
+      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+      uses: docker/build-push-action@v4
       with:
         push: true
-        files: |
-          compose.yml
-          compose.override.yml
-        set: |
-          *.cache-from=type=gha
-          *.cache-to=type=gha,mode=max
-          *.platform=linux/amd64,linux/arm64
+        tags: |
+          ${{ env.DOCKER_USERNAME }}/auth-service:latest
+        context: .
+        file: ./Dockerfile
 
-  # Deployment job - deploys to production server after successful build
-  deploy:
-    needs: build  # Wait for build job to complete
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    # Authenticate with Docker Hub (needed for pulling images on server)
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    # Install sshpass for password-based SSH authentication
-    - name: Install sshpass
-      run: sudo apt-get install sshpass
-
-    # Copy compose.yml to production server
-    - name: Copy compose.yml to droplet
-      run: sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
-
-    # Deploy to production server via SSH
-    - name: Deploy
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ vars.DROPLET_IP }}
-        username: root
-        password: ${{ secrets.DROPLET_PASSWORD }}
-        script: |
-          cd ~
-          # Set environment variables for production
-          export JWT_SECRET=${{ secrets.JWT_SECRET }}
-          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}
-          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
-          export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
-          export EMAIL_SERVICE_HOST=${{ vars.EMAIL_SERVICE_HOST }}
-          export EMAIL_FROM_USER=${{ vars.EMAIL_FROM_USER }}
-          export EMAIL_TIMEOUT_MILLIS=${{ vars.EMAIL_TIMEOUT_MILLIS }}
-
-          # Stop existing containers (best-effort)
-          docker compose down || true
-
-          # Aggressive cleanup to free space and remove stale artifacts
-          docker image prune -af || true
-          docker container prune -f || true
-          docker volume prune -f || true
-          # system prune including volumes; some older dockers may not accept --volumes -> fallback to without
-          docker system prune -af --volumes || docker system prune -af || true
-
-          if [ -e /var/run/docker/runtime-runc ]; then
-            rm -f /var/run/docker/runtime-runc
-          fi
-
-          if [ -e /var/run/docker/runtime-runc ] || [ -e /var/run/docker/containerd ]; then
-            echo "Detected stale docker runtime state — attempting to restart docker daemon"
-            sudo systemctl restart docker || sudo service docker restart || true
-            sleep 3
-          fi
-
-          # Report disk usage for debugging
-          df -h || true
-
-          # Pull latest images and start fresh containers
-          docker compose pull
-          docker compose up -d
+    - name: Final message
+      run: echo "Build, test and image build completed successfully."
