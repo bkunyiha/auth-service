@@ -1,65 +1,66 @@
 name: Build, Test and Deploy to Prod
 
-# Trigger the workflow when changes are pushed to the main branch
 on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
 
-# During Build phase, force SQLx offline mode to prevent compile-time database connection errors
 env:
   SQLX_OFFLINE: true
 
 jobs:
-  # Build and test job - runs tests and builds Docker images
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Clean up Docker early so we free disk before starting test containers
-      - name: Clean up Docker (free disk before starting containers)
+      - name: Docker cleanup & restart daemon (fix runc/runtime state)
         run: |
           docker container prune -f || true
-          docker image prune -af || true
-          docker volume prune -f || true
-          docker system prune -af || true
+          docker image prune -f || true
+          # restart docker daemon to clear any stale runtime state
+          sudo systemctl restart docker || true
+          # short pause to let daemon come back
+          sleep 5
 
-      # Start Postgres and Redis as containers in steps (ensures cleanup runs first)
-      - name: Start Postgres and Redis for tests
+      - name: Start Postgres (CI container)
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
         run: |
-          docker pull postgres:15.2-alpine
-          docker pull redis:7.0-alpine
-
-          docker run -d --name test-postgres \
+          docker rm -f postgres-ci || true
+          docker run -d --name postgres-ci \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
             -e POSTGRES_DB=postgres \
             -p 5432:5432 \
             postgres:15.2-alpine
-
-          docker run -d --name test-redis -p 6379:6379 redis:7.0-alpine
-
-          # Wait for Postgres to accept connections (up to ~30s)
-          for i in $(seq 1 30); do
-            docker exec test-postgres pg_isready -U postgres && break
-            echo "waiting for postgres ($i/30)..."
+          # Wait for Postgres port
+          for i in $(seq 1 60); do
+            if bash -c "cat < /dev/tcp/localhost/5432" >/dev/null 2>&1; then
+              echo "Postgres port is open"
+              break
+            fi
+            echo "waiting for postgres listener ($i/60)..."
             sleep 1
           done
 
-          if ! docker exec test-postgres pg_isready -U postgres; then
-            echo "Postgres did not start in time" >&2
-            docker logs test-postgres || true
-            exit 1
-          fi
+      - name: Start Redis (CI container)
+        run: |
+          docker rm -f redis-ci || true
+          docker run -d --name redis-ci -p 6379:6379 redis:7.0-alpine
+          # Wait for Redis port
+          for i in $(seq 1 60); do
+            if bash -c "cat < /dev/tcp/localhost/6379" >/dev/null 2>&1; then
+              echo "Redis port is open"
+              break
+            fi
+            echo "waiting for redis listener ($i/60)..."
+            sleep 1
+          done
 
-      # Cache Rust dependencies to speed up build times
       - name: Cache dependencies
         uses: actions/cache@v3
         with:
@@ -71,39 +72,34 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      # Install Rust toolchain
       - name: Install Rust
         run: rustup update stable && rustup default stable
 
-      # Build and test app-service (main application)
       - name: Build and test app-service code
         working-directory: ./app-service
         run: |
           cargo build --verbose
           cargo test --verbose
 
-      # Build and test auth-service (authentication service)
       - name: Build and test auth-service code
         working-directory: ./auth-service
+        env:
+          JWT_SECRET: secret
+          APP_SERVICE_HOST: 0.0.0.0:8000
+          DATABASE_URL: postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
         run: |
-          export JWT_SECRET=secret
-          export APP_SERVICE_HOST=0.0.0.0:8000
-          export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
           cargo build --verbose
           cargo test --verbose
 
-      # Set up Docker Buildx for multi-platform builds
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Authenticate with Docker Hub for image pushing
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build and push Docker images using Docker Bake (reads compose.yml)
       - name: Build and push Docker images
         uses: docker/bake-action@v2.3.0
         with:
@@ -116,50 +112,52 @@ jobs:
             *.cache-to=type=gha,mode=max
             *.platform=linux/amd64,linux/arm64
 
-  # Deployment job - deploys to production server after successful build
   deploy:
-    needs: build  # Wait for build job to complete
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    # Authenticate with Docker Hub (needed for pulling images on server)
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Install sshpass for password-based SSH authentication
-    - name: Install sshpass
-      run: sudo apt-get update && sudo apt-get install -y sshpass
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
 
-    # Copy compose.yml to production server
-    - name: Copy compose.yml to droplet
-      run: sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
+      - name: Copy compose.yml to droplet
+        run: |
+          sshpass -v -p "${{ secrets.DROPLET_PASSWORD }}" scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
 
-    # Deploy to production server via SSH
-    - name: Deploy
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ vars.DROPLET_IP }}
-        username: root
-        password: ${{ secrets.DROPLET_PASSWORD }}
-        script: |
-          cd ~
-          # Set environment variables for production
-          export JWT_SECRET=${{ secrets.JWT_SECRET }}
-          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}
-          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
-          export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
-          export EMAIL_SERVICE_HOST=${{ vars.EMAIL_SERVICE_HOST }}
-          export EMAIL_FROM_USER=${{ vars.EMAIL_FROM_USER }}
-          export EMAIL_TIMEOUT_MILLIS=${{ vars.EMAIL_TIMEOUT_MILLIS }}
-          # Deploy the application
-          docker compose down      # Stop existing containers
-          docker image prune -f    # Remove old images to force fresh pull
-          docker compose pull      # Pull latest images from Docker Hub
-          docker compose up -d     # Start containers in detached mode
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.DROPLET_IP }}
+          username: root
+          password: ${{ secrets.DROPLET_PASSWORD }}
+          script: |
+            cd ~
+
+            # Create .env on droplet (values are quoted to preserve any special characters)
+            cat > .env <<EOF
+            JWT_SECRET='${{ secrets.JWT_SECRET }}'
+            APP_SERVICE_HOST='${{ vars.APP_SERVICE_HOST }}'
+            AUTH_SERVICE_IP='${{ vars.DROPLET_IP }}'
+            POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}'
+            POSTMARK_AUTH_TOKEN='${{ secrets.POSTMARK_AUTH_TOKEN }}'
+            EMAIL_SERVICE_HOST='${{ vars.EMAIL_SERVICE_HOST }}'
+            EMAIL_FROM_USER='${{ vars.EMAIL_FROM_USER }}'
+            EMAIL_TIMEOUT_MILLIS='${{ vars.EMAIL_TIMEOUT_MILLIS }}'
+            EOF
+
+            # Ensure previous services are stopped gracefully
+            docker compose down --remove-orphans || true
+            docker image prune -f || true
+
+            # Use the .env file to ensure compose picks up the exact values
+            docker compose --env-file .env pull
+            docker compose --env-file .env up -d
