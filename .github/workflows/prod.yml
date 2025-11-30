@@ -16,60 +16,87 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Service containers for testing - PostgreSQL and Redis must be running for tests
-    services:
-      postgres:
-        image: postgres:15.2-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432  # Expose PostgreSQL port for tests
-      redis:
-        image: redis:7.0-alpine
-        ports:
-          - 6379:6379  # Expose Redis port for tests
-
     steps:
       # Checkout code from the repository
     - name: Checkout code
       uses: actions/checkout@v4
 
-      # Check disk usage before cleanup for debugging
-    - name: Check disk usage (before cleanup)
+    - name: Early disk diagnostic
       run: |
-        echo "Before cleanup:"
+        echo "Disk usage at job start"
         df -h /
-        df -h /var/lib/docker || true
-        du -sh "$GITHUB_WORKSPACE" || true
+        df -h /run || true
+        df -i / || true
+        echo "Top dirs in /run"
+        sudo du -sh /run/* 2>/dev/null | sort -h | tail -n 20 || true
 
-      # Clean up Docker to free disk space before starting services
-    - name: Clean up Docker to free disk space
+    - name: Aggressive but safe cleanup to free disk
       run: |
-        # Remove stopped containers, unused images, networks, build cache and volumes
-        docker system prune --all --volumes --force || true
-        # Remove any leftover docker-compose temp files
-        rm -rf /tmp/docker-compose* || true
+        docker container prune -f || true
+        docker image prune -af || true
+        docker volume prune -f || true
+        docker builder prune -af || true
+        sudo rm -rf /opt/hostedtoolcache/* || true
+        sudo rm -rf /tmp/* || true
 
-      # Check disk usage after cleanup for debugging
-    - name: Check disk usage (after cleanup)
+    - name: Disk diagnostic after cleanup
       run: |
-        echo "After cleanup:"
+        echo "Disk usage after cleanup"
         df -h /
-        df -h /var/lib/docker || true
+        df -h /run || true
+        docker system df || true
 
-      # Cache Rust dependencies to speed up build times
-    - name: Cache dependencies
+    - name: Start Postgres and Redis (after cleanup)
+      run: |
+        docker run --name ci-postgres -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+          -e POSTGRES_DB=postgres -p 5432:5432 -d postgres:15.2-alpine
+        docker run --name ci-redis -p 6379:6379 -d redis:7.0-alpine
+
+        POSTGRES_READY=false
+        for i in $(seq 1 30); do
+          if docker exec ci-postgres pg_isready -U postgres; then
+            POSTGRES_READY=true
+            break
+          fi
+          echo "Waiting for postgres..."
+          sleep 1
+        done
+        if [ "$POSTGRES_READY" != "true" ]; then
+          echo "ERROR: Postgres failed to start within 30 seconds"
+          docker logs ci-postgres
+          exit 1
+        fi
+
+        REDIS_READY=false
+        for i in $(seq 1 30); do
+          if docker exec ci-redis redis-cli ping | grep -q PONG; then
+            REDIS_READY=true
+            break
+          fi
+          echo "Waiting for redis..."
+          sleep 1
+        done
+        if [ "$REDIS_READY" != "true" ]; then
+          echo "ERROR: Redis failed to start within 30 seconds"
+          docker logs ci-redis
+          exit 1
+        fi
+
+    - name: Set env for tests
+      run: |
+        echo "DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/postgres" >> $GITHUB_ENV
+        echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+
+    - name: Cache Rust registry and cargo
       uses: actions/cache@v4
       with:
         path: |
-          app-service/.cargo
-          app-service/target/
-          auth-service/.cargo
-          auth-service/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-
+          app-service/.cargo/registry
+          auth-service/.cargo/registry
+          ~/.cargo/bin
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-registry-
 
     # Install Rust toolchain
     - name: Install Rust
