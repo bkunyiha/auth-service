@@ -7,7 +7,7 @@ on:
       - main
   workflow_dispatch:  # Allow manual triggering
 
-# During Build phase, force SQLx offline mode to prevent compile-time database connection errors
+# During Buikd face, force SQLx offline mode to prevent compile-time database connection errors
 env:
   SQLX_OFFLINE: true
 
@@ -16,143 +16,135 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Expose Docker credential secrets as job env so they can be used in "if: env.*" expressions
-    env:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    # Service containers for testing - PostgreSQL and Redis must be running for tests
+    services:
+      postgres:
+        image: postgres:15.2-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432  # Expose PostgreSQL port for tests
+      redis:
+        image: redis:7.0-alpine
+        ports:
+          - 6379:6379  # Expose Redis port for tests
+
+    steps:
+      # Checkout code from the repository
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+      # Cache Rust dependencies to speed up build times
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          app-service/.cargo
+          app-service/target/
+          auth-service/.cargo
+          auth-service/target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-cargo-
+
+    # Install Rust toolchain
+    - name: Install Rust
+      run: rustup update stable && rustup default stable
+
+    # Build and test app-service (main application)
+    - name: Build and test app-service code
+      working-directory: ./app-service
+      run: |
+        cargo build --verbose
+        cargo test --verbose
+
+    # Build and test auth-service (authentication service)
+    - name: Build and test auth-service code
+      working-directory: ./auth-service
+      run: |
+        export JWT_SECRET=secret
+        export APP_SERVICE_HOST=0.0.0.0:8000
+        export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
+        cargo build --verbose
+        cargo test --verbose
+
+    # Set up Docker Buildx for multi-platform builds
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    # Authenticate with Docker Hub for image pushing
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Clean up Docker to free disk space before building images
+    - name: Clean up Docker
+      run: |
+        docker container prune -f
+        docker image prune -af
+        docker volume prune -f
+        docker system prune -af
+
+    # Build and push Docker images using Docker Bake (reads compose.yml)
+    - name: Build and push Docker images
+      uses: docker/bake-action@v2.3.0
+      with:
+        push: true
+        files: |
+          compose.yml
+          compose.override.yml
+        set: |
+          *.cache-from=type=gha
+          *.cache-to=type=gha,mode=max
+          *.platform=linux/amd64,linux/arm64
+
+  # Deployment job - deploys to production server after successful build
+  deploy:
+    needs: build  # Wait for build job to complete
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v2
 
-    - name: Early disk diagnostic
-      run: |
-        echo "Disk usage at job start"
-        df -h /
-        df -h /run || true
-        df -i / || true
-        echo "Top dirs in /run"
-        sudo du -sh /run/* 2>/dev/null | sort -h | tail -n 20 || true
-
-    - name: Aggressive but safe cleanup to free disk
-      run: |
-        # Remove stopped containers, dangling images, build cache and unused volumes
-        docker container prune -f || true
-        docker image prune -af || true
-        docker volume prune -f || true
-        docker builder prune -af || true
-        # Free GitHub runner toolcache and tmp which can consume space
-        sudo rm -rf /opt/hostedtoolcache/* || true
-        sudo rm -rf /tmp/* || true
-
-    - name: Disk diagnostic after cleanup
-      run: |
-        echo "Disk usage after cleanup"
-        df -h /
-        df -h /run || true
-        docker system df || true
-
-    - name: Start Postgres and Redis (after cleanup)
-      run: |
-        set -euo pipefail
-
-        # Remove any previously-created containers with the same names (ignore errors)
-        docker rm -f ci-postgres >/dev/null 2>&1 || true
-        docker rm -f ci-redis >/dev/null 2>&1 || true
-
-        # Start Postgres and Redis
-        docker run --name ci-postgres -e POSTGRES_USER=postgres \
-          -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
-          -e POSTGRES_DB=postgres -p 5432:5432 -d postgres:15.2-alpine
-        docker run --name ci-redis -p 6379:6379 -d redis:7.0-alpine
-
-        # Wait for Postgres readiness (timeout after 30s)
-        for i in $(seq 1 30); do
-          if docker exec ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
-            echo "Postgres is ready"
-            break
-          fi
-          echo "Waiting for postgres... ($i/30)"
-          sleep 1
-        done
-
-        # Fail fast if Postgres did not become ready
-        if ! docker exec ci-postgres pg_isready -U postgres >/dev/null 2>&1; then
-          echo "Postgres did not become ready in time" >&2
-          docker logs ci-postgres || true
-          exit 1
-        fi
-
-        # Wait for Redis readiness (timeout after 30s)
-        for i in $(seq 1 30); do
-          if docker exec ci-redis redis-cli ping | grep -q PONG; then
-            echo "Redis is ready"
-            break
-          fi
-          echo "Waiting for redis... ($i/30)"
-          sleep 1
-        done
-
-        # Fail fast if Redis did not become ready
-        if ! docker exec ci-redis redis-cli ping | grep -q PONG; then
-          echo "Redis did not become ready in time" >&2
-          docker logs ci-redis || true
-          exit 1
-        fi
-
-        echo "Postgres and Redis are ready"
-
-    - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+    # Authenticate with Docker Hub (needed for pulling images on server)
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v1
       with:
-        toolchain: stable
-        override: true
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Cache cargo registry and build artifacts
-      uses: actions/cache@v4
+    # Install sshpass for password-based SSH authentication
+    - name: Install sshpass
+      run: sudo apt-get install sshpass
+
+    # Copy compose.yml to production server
+    - name: Copy compose.yml to droplet
+      run: sshpass -v -p ${{ secrets.DROPLET_PASSWORD }} scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
+
+    # Deploy to production server via SSH
+    - name: Deploy
+      uses: appleboy/ssh-action@master
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: cargo-cache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          cargo-cache-${{ runner.os }}-
-
-    - name: Run tests
-      run: |
-        # Ensure SQLX_OFFLINE remains set; tests should use the local test DB started above
-        cargo test --workspace --verbose
-
-    - name: Build release binary
-      run: |
-        cargo build --release --workspace
-
-    - name: Build Docker image
-      uses: docker/build-push-action@v4
-      with:
-        push: false
-        tags: |
-          ghcr.io/${{ github.repository_owner }}/auth-service:latest
-        context: .
-        file: ./Dockerfile
-
-    - name: Log in to Docker Hub (optional)
-      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
-      uses: docker/login-action@v2
-      with:
-        username: ${{ env.DOCKER_USERNAME }}
-        password: ${{ env.DOCKER_PASSWORD }}
-
-    - name: Push Docker image to Docker Hub (optional)
-      if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
-      uses: docker/build-push-action@v4
-      with:
-        push: true
-        tags: |
-          ${{ env.DOCKER_USERNAME }}/auth-service:latest
-        context: .
-        file: ./Dockerfile
-
-    - name: Final message
-      run: echo "Build, test and image build completed successfully."
+        host: ${{ vars.DROPLET_IP }}
+        username: root
+        password: ${{ secrets.DROPLET_PASSWORD }}
+        script: |
+          cd ~
+          # Set environment variables for production
+          export JWT_SECRET=${{ secrets.JWT_SECRET }}
+          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}          
+          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
+          export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
+          export EMAIL_SERVICE_HOST=${{ vars.EMAIL_SERVICE_HOST }}
+          export EMAIL_FROM_USER=${{ vars.EMAIL_FROM_USER }}
+          export EMAIL_TIMEOUT_MILLIS=${{ vars.EMAIL_TIMEOUT_MILLIS }}
+          # Deploy the application
+          docker compose down      # Stop existing containers
+          docker image prune -f    # Remove old images to force fresh pull
+          docker compose pull      # Pull latest images from Docker Hub
+          docker compose up -d     # Start containers in detached mode
