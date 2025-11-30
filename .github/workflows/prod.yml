@@ -7,7 +7,7 @@ on:
       - main
   workflow_dispatch:  # Allow manual triggering
 
-# During Buikd face, force SQLx offline mode to prevent compile-time database connection errors
+# During Build phase, force SQLx offline mode to prevent compile-time database connection errors
 env:
   SQLX_OFFLINE: true
 
@@ -16,90 +16,105 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Service containers for testing - PostgreSQL and Redis must be running for tests
-    services:
-      postgres:
-        image: postgres:15.2-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432  # Expose PostgreSQL port for tests
-      redis:
-        image: redis:7.0-alpine
-        ports:
-          - 6379:6379  # Expose Redis port for tests
-
     steps:
       # Checkout code from the repository
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Clean up Docker early so we free disk before starting test containers
+      - name: Clean up Docker (free disk before starting containers)
+        run: |
+          docker container prune -f || true
+          docker image prune -af || true
+          docker volume prune -f || true
+          docker system prune -af || true
+
+      # Start Postgres and Redis as containers in steps (ensures cleanup runs first)
+      - name: Start Postgres and Redis for tests
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          docker pull postgres:15.2-alpine
+          docker pull redis:7.0-alpine
+
+          docker run -d --name test-postgres \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+            -e POSTGRES_DB=postgres \
+            -p 5432:5432 \
+            postgres:15.2-alpine
+
+          docker run -d --name test-redis -p 6379:6379 redis:7.0-alpine
+
+          # Wait for Postgres to accept connections (up to ~30s)
+          for i in $(seq 1 30); do
+            docker exec test-postgres pg_isready -U postgres && break
+            echo "waiting for postgres ($i/30)..."
+            sleep 1
+          done
+
+          if ! docker exec test-postgres pg_isready -U postgres; then
+            echo "Postgres did not start in time" >&2
+            docker logs test-postgres || true
+            exit 1
+          fi
 
       # Cache Rust dependencies to speed up build times
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          app-service/.cargo
-          app-service/target/
-          auth-service/.cargo
-          auth-service/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            app-service/.cargo
+            app-service/target/
+            auth-service/.cargo
+            auth-service/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
-    # Install Rust toolchain
-    - name: Install Rust
-      run: rustup update stable && rustup default stable
+      # Install Rust toolchain
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
 
-    # Build and test app-service (main application)
-    - name: Build and test app-service code
-      working-directory: ./app-service
-      run: |
-        cargo build --verbose
-        cargo test --verbose
+      # Build and test app-service (main application)
+      - name: Build and test app-service code
+        working-directory: ./app-service
+        run: |
+          cargo build --verbose
+          cargo test --verbose
 
-    # Build and test auth-service (authentication service)
-    - name: Build and test auth-service code
-      working-directory: ./auth-service
-      run: |
-        export JWT_SECRET=secret
-        export APP_SERVICE_HOST=0.0.0.0:8000
-        export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
-        cargo build --verbose
-        cargo test --verbose
+      # Build and test auth-service (authentication service)
+      - name: Build and test auth-service code
+        working-directory: ./auth-service
+        run: |
+          export JWT_SECRET=secret
+          export APP_SERVICE_HOST=0.0.0.0:8000
+          export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
+          cargo build --verbose
+          cargo test --verbose
 
-    # Set up Docker Buildx for multi-platform builds
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      # Set up Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-    # Authenticate with Docker Hub for image pushing
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      # Authenticate with Docker Hub for image pushing
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Clean up Docker to free disk space before building images
-    - name: Clean up Docker
-      run: |
-        docker container prune -f
-        docker image prune -af
-        docker volume prune -f
-        docker system prune -af
-
-    # Build and push Docker images using Docker Bake (reads compose.yml)
-    - name: Build and push Docker images
-      uses: docker/bake-action@v2.3.0
-      with:
-        push: true
-        files: |
-          compose.yml
-          compose.override.yml
-        set: |
-          *.cache-from=type=gha
-          *.cache-to=type=gha,mode=max
-          *.platform=linux/amd64,linux/arm64
+      # Build and push Docker images using Docker Bake (reads compose.yml)
+      - name: Build and push Docker images
+        uses: docker/bake-action@v2.3.0
+        with:
+          push: true
+          files: |
+            compose.yml
+            compose.override.yml
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
+            *.platform=linux/amd64,linux/arm64
 
   # Deployment job - deploys to production server after successful build
   deploy:
@@ -119,7 +134,7 @@ jobs:
 
     # Install sshpass for password-based SSH authentication
     - name: Install sshpass
-      run: sudo apt-get install sshpass
+      run: sudo apt-get update && sudo apt-get install -y sshpass
 
     # Copy compose.yml to production server
     - name: Copy compose.yml to droplet
@@ -136,7 +151,7 @@ jobs:
           cd ~
           # Set environment variables for production
           export JWT_SECRET=${{ secrets.JWT_SECRET }}
-          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}          
+          export APP_SERVICE_HOST=${{ vars.APP_SERVICE_HOST }}
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
           export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
