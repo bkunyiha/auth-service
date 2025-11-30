@@ -55,19 +55,35 @@ jobs:
           -e POSTGRES_DB=postgres -p 5432:5432 -d postgres:15.2-alpine
         docker run --name ci-redis -p 6379:6379 -d redis:7.0-alpine
 
-        # Wait for Postgres readiness
+        # Wait for Postgres readiness (fail if not ready within 30 seconds)
+        POSTGRES_READY=false
         for i in $(seq 1 30); do
-          docker exec ci-postgres pg_isready -U postgres && break
+          if docker exec ci-postgres pg_isready -U postgres; then
+            POSTGRES_READY=true
+            break
+          fi
           echo "Waiting for postgres..."
           sleep 1
         done
+        if [ "$POSTGRES_READY" != "true" ]; then
+          echo "ERROR: Postgres failed to become ready within 30 seconds"
+          exit 1
+        fi
 
-        # Wait for Redis readiness
+        # Wait for Redis readiness (fail if not ready within 30 seconds)
+        REDIS_READY=false
         for i in $(seq 1 30); do
-          docker exec ci-redis redis-cli ping | grep -q PONG && break
+          if docker exec ci-redis redis-cli ping | grep -q PONG; then
+            REDIS_READY=true
+            break
+          fi
           echo "Waiting for redis..."
           sleep 1
         done
+        if [ "$REDIS_READY" != "true" ]; then
+          echo "ERROR: Redis failed to become ready within 30 seconds"
+          exit 1
+        fi
 
     - name: Set env for tests
       run: |
