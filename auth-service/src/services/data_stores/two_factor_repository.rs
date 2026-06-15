@@ -1,6 +1,6 @@
 use crate::domain::Email;
 use color_eyre::eyre::{Context, Report, Result, eyre};
-use rand::Rng;
+use rand::RngExt;
 use thiserror::Error;
 use uuid::Uuid;
 

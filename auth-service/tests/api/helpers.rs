@@ -218,8 +218,9 @@ async fn configure_database(db_conn_string: &str, db_name: &str) {
         .expect("Failed to create Postgres connection pool.");
 
     // Create a new database
+    let create_db_query = format!(r#"CREATE DATABASE "{}";"#, db_name);
     connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, db_name).as_str())
+        .execute(sqlx::raw_sql(sqlx::AssertSqlSafe(create_db_query)))
         .await
         .expect("Failed to create database.");
 
@@ -265,25 +266,24 @@ async fn delete_database(db_name: &str) {
         .expect("Failed to connect to Postgres");
 
     // Kill any active connections to the database
-    connection
-        .execute(
-            format!(
-                r#"
+    let terminate_query = format!(
+        r#"
                 SELECT pg_terminate_backend(pg_stat_activity.pid)
                 FROM pg_stat_activity
                 WHERE pg_stat_activity.datname = '{}'
                   AND pid <> pg_backend_pid();
         "#,
-                db_name
-            )
-            .as_str(),
-        )
+        db_name
+    );
+    connection
+        .execute(sqlx::raw_sql(sqlx::AssertSqlSafe(terminate_query)))
         .await
         .expect("Failed to drop the database.");
 
     // Drop the database
+    let drop_db_query = format!(r#"DROP DATABASE "{}";"#, db_name);
     connection
-        .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
+        .execute(sqlx::raw_sql(sqlx::AssertSqlSafe(drop_db_query)))
         .await
         .expect("Failed to drop the database.");
 }
